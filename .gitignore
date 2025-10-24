@@ -1,0 +1,107 @@
+# Global ignores
+*.swp
+*.tmp
+*.log
+*.bak
+*.orig
+*~
+.DS_Store
+Thumbs.db
+
+# Visual Studio / .NET artifacts
+**/bin/
+**/obj/
+[Bb]uild/
+_ReSharper*/
+*.resharper
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+*.csproj.user
+*.vspx
+*.vspscc
+*.vssscc
+*.ncrunch*.
+.vs/
+TestResult*/
+
+# NuGet / packages
+packages/
+.nuget/
+*.nupkg
+
+# Configuration & secrets
+ThiTracNghiemApi/appsettings.json
+ThiTracNghiemApi/appsettings.Development.json
+ThiTracNghiemApi/Properties/launchSettings.json
+*.pfx
+*.snk
+.env
+thitracnghiemapp/.env
+
+# Database files
+*.mdf
+*.ldf
+*.db
+*.sqlite*
+
+# Flutter & Dart tooling
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.melos_tool/
+
+# Flutter build outputs
+thitracnghiemapp/build/
+**/generated_plugin_registrant.dart
+
+# Android specifics
+thitracnghiemapp/android/.gradle/
+thitracnghiemapp/android/.idea/
+thitracnghiemapp/android/app/build/
+thitracnghiemapp/android/local.properties
+thitracnghiemapp/android/key.properties
+
+# iOS specifics
+thitracnghiemapp/ios/Pods/
+thitracnghiemapp/ios/.symlinks/
+thitracnghiemapp/ios/Flutter/Flutter.framework/
+thitracnghiemapp/ios/Flutter/App.framework/
+thitracnghiemapp/ios/Flutter/engine/
+thitracnghiemapp/ios/Flutter/Generated.xcconfig
+thitracnghiemapp/ios/Flutter/ephemeral/
+thitracnghiemapp/ios/Runner.xcworkspace/
+
+# macOS specifics
+thitracnghiemapp/macos/Pods/
+thitracnghiemapp/macos/Runner.xcworkspace/
+thitracnghiemapp/macos/Flutter/ephemeral/
+
+# Windows specifics
+thitracnghiemapp/windows/flutter/ephemeral/
+thitracnghiemapp/windows/CMakeFiles/
+
+# Linux specifics
+thitracnghiemapp/linux/flutter/ephemeral/
+thitracnghiemapp/linux/CMakeFiles/
+
+# Web specifics
+thitracnghiemapp/.firebase/
+
+# IDE metadata
+.idea/
+*.iml
+.vscode/
+
+# Flutter metadata (project copies)
+thitracnghiemapp/.dart_tool/
+thitracnghiemapp/.packages
+thitracnghiemapp/.flutter-plugins
+thitracnghiemapp/.flutter-plugins-dependencies
+thitracnghiemapp/.metadata
+
+# Coverage
+coverage/
+thitracnghiemapp/coverage/

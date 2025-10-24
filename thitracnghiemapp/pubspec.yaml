@@ -1,0 +1,31 @@
+name: thitracnghiemapp
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  cached_network_image: ^3.4.1
+  flutter:
+    sdk: flutter
+  flutter_dotenv: ^6.0.0
+  flutter_secure_storage: ^9.2.4
+  http: ^1.5.0
+  intl: ^0.20.2
+  json_annotation: ^4.9.0
+  json_serializable: ^6.11.1
+  provider: ^6.1.5+1
+  shared_preferences: ^2.5.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  build_runner: ^2.10.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env

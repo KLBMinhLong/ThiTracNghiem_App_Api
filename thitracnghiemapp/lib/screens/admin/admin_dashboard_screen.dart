@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -24,6 +27,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _selectedIndex = 0;
   int _userPage = 1;
   int _examPage = 1;
+  bool _isImportingQuestions = false;
+  int? _selectedTopicForImport;
 
   @override
   void initState() {
@@ -41,10 +46,77 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     await Future.wait([
       context.read<UsersProvider>().fetchUsers(page: _userPage),
       context.read<ChuDeProvider>().fetchChuDes(),
-      context.read<CauHoiProvider>().fetchCauHois(),
+      context.read<CauHoiProvider>().refreshCauHois(),
       context.read<DeThiProvider>().fetchAdminDeThis(page: _examPage),
       context.read<LienHeProvider>().fetchAll(),
     ]);
+  }
+
+  Future<void> _importQuestions() async {
+    try {
+      final topicId = _selectedTopicForImport;
+      if (topicId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vui lòng chọn chủ đề trước khi import.'),
+          ),
+        );
+        return;
+      }
+
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['xlsx'],
+      );
+
+      if (result == null || result.files.isEmpty) {
+        return;
+      }
+
+      final picked = result.files.first;
+      final path = picked.path;
+      if (path == null) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Thiết bị không hỗ trợ import file Excel .xlsx.'),
+          ),
+        );
+        return;
+      }
+
+      setState(() => _isImportingQuestions = true);
+
+      final provider = context.read<CauHoiProvider>();
+      final successMessage = await provider.importCauHois(
+        File(path),
+        topicId: topicId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() => _isImportingQuestions = false);
+
+      final messenger = ScaffoldMessenger.of(context);
+      if (successMessage != null) {
+        messenger.showSnackBar(SnackBar(content: Text(successMessage)));
+      } else {
+        final errorMessage = provider.error ?? 'Import câu hỏi thất bại.';
+        messenger.showSnackBar(SnackBar(content: Text(errorMessage)));
+      }
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isImportingQuestions = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể đọc file Excel: $error')),
+      );
+    }
   }
 
   // Removed controller disposal helper to avoid races during dialog teardown.
@@ -293,51 +365,244 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Consumer2<CauHoiProvider, ChuDeProvider>(
       builder: (context, questionProvider, topicProvider, _) {
         final questions = questionProvider.cauHois;
+        final topics = topicProvider.chuDes;
+
+        if (_selectedTopicForImport == null && topics.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            setState(() => _selectedTopicForImport = topics.first.id);
+          });
+        } else if (_selectedTopicForImport != null &&
+            topics.every((topic) => topic.id != _selectedTopicForImport)) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            setState(
+              () => _selectedTopicForImport = topics.isNotEmpty
+                  ? topics.first.id
+                  : null,
+            );
+          });
+        }
+        final selectedFilter = questionProvider.selectedTopicId;
+        final filterValue = topics.any((topic) => topic.id == selectedFilter)
+            ? selectedFilter
+            : null;
+        final errorText = questionProvider.error;
+        final isInitialLoading =
+            questionProvider.isLoading && questions.isEmpty;
+
         return Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
               Align(
                 alignment: Alignment.centerRight,
-                child: FilledButton.icon(
-                  onPressed: () => _showQuestionDialog(),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Thêm câu hỏi'),
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    SizedBox(
+                      width: 240,
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Lọc câu hỏi theo chủ đề',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                        child: topics.isEmpty
+                            ? const Text('Chưa có chủ đề')
+                            : DropdownButtonHideUnderline(
+                                child: DropdownButton<int?>(
+                                  value: filterValue,
+                                  isExpanded: true,
+                                  onChanged: questionProvider.isLoading
+                                      ? null
+                                      : (value) {
+                                          questionProvider.setTopicFilter(
+                                            value,
+                                          );
+                                        },
+                                  items: [
+                                    DropdownMenuItem<int?>(
+                                      value: null,
+                                      child: const Text('Tất cả chủ đề'),
+                                    ),
+                                    for (final topic in topics)
+                                      DropdownMenuItem<int?>(
+                                        value: topic.id,
+                                        child: Text(topic.tenChuDe),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 240,
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Chủ đề cho file Excel',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                        child: topics.isEmpty
+                            ? const Text('Chưa có chủ đề')
+                            : DropdownButtonHideUnderline(
+                                child: DropdownButton<int>(
+                                  value: _selectedTopicForImport,
+                                  isExpanded: true,
+                                  onChanged: _isImportingQuestions
+                                      ? null
+                                      : (value) => setState(
+                                          () => _selectedTopicForImport = value,
+                                        ),
+                                  items: [
+                                    for (final topic in topics)
+                                      DropdownMenuItem<int>(
+                                        value: topic.id,
+                                        child: Text(topic.tenChuDe),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _isImportingQuestions || topics.isEmpty
+                          ? null
+                          : _importQuestions,
+                      icon: _isImportingQuestions
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.upload_file_outlined),
+                      label: Text(
+                        _isImportingQuestions
+                            ? 'Đang nhập...'
+                            : 'Nhập từ Excel',
+                      ),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () => _showQuestionDialog(),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Thêm câu hỏi'),
+                    ),
+                  ],
                 ),
               ),
+              if (errorText != null)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(
+                      errorText,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+                ),
               const SizedBox(height: 16),
               Expanded(
-                child: questionProvider.isLoading
+                child: isInitialLoading
                     ? const Center(child: CircularProgressIndicator())
-                    : ListView.separated(
-                        itemCount: questions.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final question = questions[index];
-                          return Card(
-                            child: ListTile(
-                              title: Text(question.noiDung),
-                              subtitle: Text(
-                                'Đáp án đúng: ${question.dapAnDung} | Chủ đề: ${question.chuDe?.tenChuDe ?? ''}',
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.edit_outlined),
-                                    onPressed: () =>
-                                        _showQuestionDialog(question: question),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline),
-                                    onPressed: () =>
-                                        _deleteQuestion(question.id),
+                    : RefreshIndicator(
+                        onRefresh: () => questionProvider.refreshCauHois(
+                          topicId: questionProvider.selectedTopicId,
+                        ),
+                        child: questions.isEmpty
+                            ? ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                children: const [
+                                  SizedBox(
+                                    height: 240,
+                                    child: Center(
+                                      child: Text('Không có câu hỏi phù hợp.'),
+                                    ),
                                   ),
                                 ],
+                              )
+                            : ListView.separated(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                itemCount:
+                                    questions.length +
+                                    (questionProvider.isLoadingMore ||
+                                            questionProvider.canLoadMore
+                                        ? 1
+                                        : 0),
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 12),
+                                itemBuilder: (context, index) {
+                                  if (index >= questions.length) {
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 16,
+                                      ),
+                                      child: Center(
+                                        child: questionProvider.isLoadingMore
+                                            ? const CircularProgressIndicator()
+                                            : OutlinedButton.icon(
+                                                onPressed:
+                                                    questionProvider.canLoadMore
+                                                    ? () {
+                                                        questionProvider
+                                                            .loadMoreCauHois();
+                                                      }
+                                                    : null,
+                                                icon: const Icon(
+                                                  Icons.expand_more,
+                                                ),
+                                                label: const Text(
+                                                  'Tải thêm câu hỏi',
+                                                ),
+                                              ),
+                                      ),
+                                    );
+                                  }
+
+                                  final question = questions[index];
+                                  return Card(
+                                    child: ListTile(
+                                      title: Text(question.noiDung),
+                                      subtitle: Text(
+                                        'Đáp án đúng: ${question.dapAnDung} | Chủ đề: ${question.chuDe?.tenChuDe ?? ''}',
+                                      ),
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.edit_outlined,
+                                            ),
+                                            onPressed: () =>
+                                                _showQuestionDialog(
+                                                  question: question,
+                                                ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.delete_outline,
+                                            ),
+                                            onPressed: () =>
+                                                _deleteQuestion(question.id),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                            ),
-                          );
-                        },
                       ),
               ),
             ],
@@ -352,6 +617,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       builder: (context, examProvider, topicProvider, _) {
         final response = examProvider.adminDeThis;
         final exams = response?.items ?? const <DeThi>[];
+        final topicMap = {
+          for (final topic in topicProvider.chuDes) topic.id: topic.tenChuDe,
+        };
+
         return Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -373,13 +642,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final exam = exams[index];
+                          final topicName =
+                              topicMap[exam.chuDeId] ??
+                              'Chủ đề ${exam.chuDeId}';
                           return Card(
                             child: ListTile(
                               title: Text(exam.tenDeThi),
                               subtitle: Text(
-                                'Chủ đề: ${exam.chuDe?.tenChuDe ?? ''}\nThời gian: ${exam.thoiGianThi} phút | ${exam.soCauHoi} câu',
+                                'Chủ đề: $topicName | Số câu: ${exam.soCauHoi} | Thời gian: ${exam.thoiGianThi} phút | Trạng thái: ${exam.trangThai}',
                               ),
-                              isThreeLine: true,
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -902,7 +1173,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }
     }
 
-    await questionProvider.fetchCauHois();
+    await questionProvider.refreshCauHois(
+      topicId: questionProvider.selectedTopicId,
+    );
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

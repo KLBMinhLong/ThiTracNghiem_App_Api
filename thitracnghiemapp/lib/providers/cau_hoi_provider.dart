@@ -10,26 +10,84 @@ class CauHoiProvider extends ChangeNotifier {
 
   CauHoiProvider(this._service);
 
+  static const int _defaultPageSize = 20;
+
   List<CauHoi> _cauHois = const [];
   bool _loading = false;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  int _nextPage = 1;
+  int? _selectedTopicId;
   String? _error;
 
   List<CauHoi> get cauHois => _cauHois;
   bool get isLoading => _loading;
+  bool get isLoadingMore => _loadingMore;
+  bool get canLoadMore => _hasMore && !_loading && !_loadingMore;
+  int? get selectedTopicId => _selectedTopicId;
   String? get error => _error;
 
-  Future<void> fetchCauHois() async {
+  Future<void> refreshCauHois({int? topicId}) async {
+    final effectiveTopicId = topicId ?? _selectedTopicId;
+    if (_loading && effectiveTopicId == _selectedTopicId) {
+      return;
+    }
+
     _loading = true;
     _error = null;
+    _selectedTopicId = effectiveTopicId;
+    _nextPage = 1;
     notifyListeners();
+
     try {
-      _cauHois = await _service.fetchCauHois();
+      final response = await _service.fetchCauHois(
+        page: _nextPage,
+        pageSize: _defaultPageSize,
+        topicId: _selectedTopicId,
+      );
+      _cauHois = response.items;
+      _hasMore = !response.isLastPage;
+      _nextPage = response.page + 1;
     } catch (error) {
       _error = error.toString();
+      _cauHois = const [];
+      _hasMore = false;
     } finally {
       _loading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> loadMoreCauHois() async {
+    if (!canLoadMore) {
+      return;
+    }
+
+    _loadingMore = true;
+    notifyListeners();
+
+    try {
+      final response = await _service.fetchCauHois(
+        page: _nextPage,
+        pageSize: _defaultPageSize,
+        topicId: _selectedTopicId,
+      );
+      _cauHois = List<CauHoi>.from(_cauHois)..addAll(response.items);
+      _hasMore = !response.isLastPage;
+      _nextPage = response.page + 1;
+    } catch (error) {
+      _error = error.toString();
+    } finally {
+      _loadingMore = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> setTopicFilter(int? topicId) async {
+    if (_selectedTopicId == topicId && _cauHois.isNotEmpty) {
+      return;
+    }
+    await refreshCauHois(topicId: topicId);
   }
 
   Future<CauHoi?> createCauHoi({
@@ -55,7 +113,10 @@ class CauHoiProvider extends ChangeNotifier {
         dapAnDung: dapAnDung,
         chuDeId: chuDeId,
       );
-      _cauHois = List<CauHoi>.from(_cauHois)..add(cauHoi);
+
+      if (_selectedTopicId == null || _selectedTopicId == chuDeId) {
+        _cauHois = [cauHoi, ..._cauHois];
+      }
       notifyListeners();
       return cauHoi;
     } catch (error) {
@@ -90,6 +151,7 @@ class CauHoiProvider extends ChangeNotifier {
         dapAnDung: dapAnDung,
         chuDeId: chuDeId,
       );
+
       _cauHois = _cauHois
           .map(
             (cauHoi) => cauHoi.id == id
@@ -132,15 +194,15 @@ class CauHoiProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> importCauHois(File file) async {
+  Future<String?> importCauHois(File file, {required int topicId}) async {
     try {
-      await _service.importFromExcel(file);
-      await fetchCauHois();
-      return true;
+      final message = await _service.importFromExcel(file, topicId: topicId);
+      await refreshCauHois(topicId: _selectedTopicId);
+      return message;
     } catch (error) {
       _error = error.toString();
       notifyListeners();
-      return false;
+      return null;
     }
   }
 }

@@ -95,4 +95,19 @@ class AuthService {
       body: {'currentPassword': currentPassword, 'newPassword': newPassword},
     );
   }
+
+  Future<void> forgotPassword({required String email}) async {
+    await _client.post('/api/Auth/forgot-password', body: {'email': email});
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String token,
+    required String newPassword,
+  }) async {
+    await _client.post(
+      '/api/Auth/reset-password',
+      body: {'email': email, 'token': token, 'newPassword': newPassword},
+    );
+  }
 }

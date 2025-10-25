@@ -6,11 +6,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Logging;
 using ThiTracNghiemApi;
 using ThiTracNghiemApi.Dtos.Auth;
 using ThiTracNghiemApi.Dtos.Users;
 using ThiTracNghiemApi.Extensions;
+using ThiTracNghiemApi.Services;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -19,12 +22,21 @@ public class AuthController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly IConfiguration _config;
+    private readonly IEmailSender _emailSender;
+    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IConfiguration config)
+    public AuthController(
+        UserManager<ApplicationUser> userManager,
+        SignInManager<ApplicationUser> signInManager,
+        IConfiguration config,
+        IEmailSender emailSender,
+        ILogger<AuthController> logger)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _config = config;
+        _emailSender = emailSender;
+        _logger = logger;
     }
 
     [HttpPost("register")]
@@ -77,6 +89,116 @@ public class AuthController : ControllerBase
 
         var response = await BuildAuthResponseAsync(user);
         return Ok(response);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("forgot-password")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var email = request.Email.Trim();
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user == null)
+        {
+            // Trả về accepted để tránh lộ thông tin tài khoản.
+            return Accepted(new { message = "Nếu email tồn tại, hướng dẫn đặt lại mật khẩu sẽ được gửi." });
+        }
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var encodedToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(token));
+        var resetBaseUrl = _config["Frontend:ResetPasswordUrl"];
+
+        var builder = new StringBuilder();
+        builder.AppendLine($"Xin chào {user.FullName ?? user.UserName ?? email},");
+        builder.AppendLine();
+        builder.AppendLine("Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản Thi Trắc Nghiệm.");
+        if (!string.IsNullOrWhiteSpace(resetBaseUrl))
+        {
+            var resetLink = string.Concat(
+                resetBaseUrl,
+                resetBaseUrl.Contains('?') ? "&" : "?",
+                "email=",
+                Uri.EscapeDataString(email),
+                "&token=",
+                encodedToken);
+            builder.AppendLine("Vui lòng nhấp vào liên kết dưới đây hoặc sao chép vào trình duyệt để tiếp tục:");
+            builder.AppendLine(resetLink);
+        }
+        else
+        {
+            builder.AppendLine("Sử dụng mã đặt lại mật khẩu sau trong ứng dụng:");
+            builder.AppendLine(encodedToken);
+        }
+        builder.AppendLine();
+        builder.AppendLine("Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email này.");
+        builder.AppendLine();
+        builder.AppendLine("Trân trọng,");
+        builder.AppendLine("Thi Trắc Nghiệm Team");
+
+        try
+        {
+            await _emailSender.SendEmailAsync(
+                email,
+                "Thi Trắc Nghiệm - Đặt lại mật khẩu",
+                builder.ToString());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send forgot password email to {Email}", email);
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                "Không thể gửi email đặt lại mật khẩu. Vui lòng thử lại sau.");
+        }
+
+        return Accepted(new { message = "Nếu email tồn tại, hướng dẫn đặt lại mật khẩu sẽ được gửi." });
+    }
+
+    [AllowAnonymous]
+    [HttpPost("reset-password")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var email = request.Email.Trim();
+        var user = await _userManager.FindByEmailAsync(email);
+        if (user == null)
+        {
+            return BadRequest("Không tìm thấy tài khoản với email đã cung cấp.");
+        }
+
+        string decodedToken;
+        try
+        {
+            var tokenBytes = WebEncoders.Base64UrlDecode(request.Token);
+            decodedToken = Encoding.UTF8.GetString(tokenBytes);
+        }
+        catch (FormatException)
+        {
+            return BadRequest("Token đặt lại mật khẩu không hợp lệ.");
+        }
+
+        var result = await _userManager.ResetPasswordAsync(user, decodedToken, request.NewPassword);
+        if (!result.Succeeded)
+        {
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError(error.Code, error.Description);
+            }
+            return ValidationProblem(ModelState);
+        }
+
+        return Ok("Đã đặt lại mật khẩu thành công.");
     }
 
     [HttpPost("login")]

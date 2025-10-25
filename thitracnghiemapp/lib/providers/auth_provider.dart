@@ -17,6 +17,8 @@ class AuthProvider extends ChangeNotifier {
   bool _initialized = false;
   bool _loading = false;
   String? _error;
+  bool _sendingResetEmail = false;
+  bool _resettingPassword = false;
 
   AuthProvider({
     required ApiClient apiClient,
@@ -33,6 +35,8 @@ class AuthProvider extends ChangeNotifier {
   bool get isAdmin => _currentUser?.isAdmin ?? false;
   User? get currentUser => _currentUser;
   String? get error => _error;
+  bool get isSendingResetEmail => _sendingResetEmail;
+  bool get isResettingPassword => _resettingPassword;
 
   Future<void> initialize() async {
     if (_initialized) {
@@ -190,6 +194,52 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     await _clearSession();
     notifyListeners();
+  }
+
+  Future<String?> sendPasswordResetEmail(String email) async {
+    if (_sendingResetEmail) {
+      return 'Đang gửi email hướng dẫn, vui lòng chờ.';
+    }
+    _sendingResetEmail = true;
+    notifyListeners();
+    try {
+      await _authService.forgotPassword(email: email);
+      return null;
+    } on ApiException catch (error) {
+      return error.message;
+    } catch (error) {
+      return error.toString();
+    } finally {
+      _sendingResetEmail = false;
+      notifyListeners();
+    }
+  }
+
+  Future<String?> resetPassword({
+    required String email,
+    required String token,
+    required String newPassword,
+  }) async {
+    if (_resettingPassword) {
+      return 'Đang đặt lại mật khẩu, vui lòng chờ.';
+    }
+    _resettingPassword = true;
+    notifyListeners();
+    try {
+      await _authService.resetPassword(
+        email: email,
+        token: token,
+        newPassword: newPassword,
+      );
+      return null;
+    } on ApiException catch (error) {
+      return error.message;
+    } catch (error) {
+      return error.toString();
+    } finally {
+      _resettingPassword = false;
+      notifyListeners();
+    }
   }
 
   Future<void> _persistSession(AuthResponse response) async {

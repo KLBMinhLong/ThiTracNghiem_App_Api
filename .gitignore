@@ -35,6 +35,7 @@ packages/
 ThiTracNghiemApi/appsettings.json
 ThiTracNghiemApi/appsettings.Development.json
 ThiTracNghiemApi/Properties/launchSettings.json
+ThiTracNghiemApi/set_smtp_env.bat
 *.pfx
 *.snk
 .env

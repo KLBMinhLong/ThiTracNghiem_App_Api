@@ -7,14 +7,58 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Microsoft.Extensions.Configuration;
 using ThiTracNghiemApi;
+using ThiTracNghiemApi.Options;
+using ThiTracNghiemApi.Services;
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Configuration.AddEnvironmentVariables();
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
+
+builder.Services.Configure<SmtpOptions>(options =>
+{
+    builder.Configuration.GetSection("Smtp").Bind(options);
+    var configUser = builder.Configuration["SMTP_EMAIL"]?.Trim();
+    var configPassword = builder.Configuration["SMTP_PASSWORD"]?.Trim();
+    var envUser = Environment.GetEnvironmentVariable("SMTP_EMAIL")?.Trim();
+    var envPassword = Environment.GetEnvironmentVariable("SMTP_PASSWORD")?.Trim();
+
+    if (string.IsNullOrWhiteSpace(options.User))
+    {
+        options.User = !string.IsNullOrWhiteSpace(configUser) ? configUser : envUser;
+    }
+
+    if (string.IsNullOrWhiteSpace(options.Password))
+    {
+        options.Password = !string.IsNullOrWhiteSpace(configPassword) ? configPassword : envPassword;
+    }
+
+    if (!string.IsNullOrEmpty(options.Password))
+    {
+        options.Password = options.Password.Replace(" ", string.Empty);
+    }
+
+    if (string.IsNullOrWhiteSpace(options.FromEmail))
+    {
+        options.FromEmail = options.User;
+    }
+    if (string.IsNullOrWhiteSpace(options.Host))
+    {
+        options.Host = "smtp.gmail.com";
+    }
+    if (options.Port == 0)
+    {
+        options.Port = 587;
+    }
+});
+
+builder.Services.AddTransient<IEmailSender, SmtpEmailSender>();
 
 builder.Services.Configure<IdentityOptions>(options =>
 {

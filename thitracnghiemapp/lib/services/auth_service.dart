@@ -9,12 +9,12 @@ class AuthService {
   const AuthService(this._client);
 
   Future<AuthResponse> login({
-    required String userName,
+    required String identifier,
     required String password,
   }) async {
     final response = await _client.post(
       '/api/Auth/login',
-      body: {'userName': userName, 'password': password},
+      body: {'userName': identifier, 'password': password},
     );
     if (response is! Map<String, dynamic>) {
       throw const ApiException(
@@ -94,6 +94,19 @@ class AuthService {
       '/api/Auth/me/password',
       body: {'currentPassword': currentPassword, 'newPassword': newPassword},
     );
+  }
+
+  Future<AuthResponse> loginWithGoogle({required String idToken}) async {
+    final response = await _client.post(
+      '/api/Auth/login/google',
+      body: {'idToken': idToken},
+    );
+    if (response is! Map<String, dynamic>) {
+      throw const ApiException(
+        message: 'Định dạng phản hồi đăng nhập Google không hợp lệ',
+      );
+    }
+    return AuthResponse.fromJson(response);
   }
 
   Future<void> forgotPassword({required String email}) async {

@@ -10,4 +10,12 @@ class AppEnv {
     }
     return value.endsWith('/') ? value.substring(0, value.length - 1) : value;
   }
+
+  static String? get googleClientId {
+    final value = dotenv.env['GOOGLE_CLIENT_ID'];
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+    return value;
+  }
 }

@@ -2,6 +2,7 @@ using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Google.Apis.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -201,6 +202,122 @@ public class AuthController : ControllerBase
         return Ok("Đã đặt lại mật khẩu thành công.");
     }
 
+    [AllowAnonymous]
+    [HttpPost("login/google")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(object))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> LoginWithGoogle([FromBody] GoogleLoginRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        if (string.IsNullOrWhiteSpace(request.IdToken))
+        {
+            return BadRequest("Token Google không hợp lệ.");
+        }
+
+        var clientIdConfig = _config["Google:ClientId"]
+            ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID");
+        if (string.IsNullOrWhiteSpace(clientIdConfig))
+        {
+            _logger.LogError("Google:ClientId is not configured.");
+            return StatusCode(StatusCodes.Status500InternalServerError, "Máy chủ chưa cấu hình đăng nhập Google.");
+        }
+
+        var audiences = clientIdConfig
+            .Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (audiences.Length == 0)
+        {
+            _logger.LogError("Google:ClientId configuration does not contain any valid client ids.");
+            return StatusCode(StatusCodes.Status500InternalServerError, "Máy chủ chưa cấu hình đăng nhập Google.");
+        }
+
+        GoogleJsonWebSignature.Payload payload;
+        try
+        {
+            payload = await GoogleJsonWebSignature.ValidateAsync(
+                request.IdToken,
+                new GoogleJsonWebSignature.ValidationSettings
+                {
+                    Audience = audiences
+                });
+        }
+        catch (InvalidJwtException ex)
+        {
+            _logger.LogWarning(ex, "Google ID token validation failed.");
+            return Unauthorized("Token Google không hợp lệ.");
+        }
+
+        if (string.IsNullOrWhiteSpace(payload.Email))
+        {
+            return BadRequest("Không tìm thấy email từ tài khoản Google.");
+        }
+
+        var user = await _userManager.FindByEmailAsync(payload.Email);
+        if (user == null)
+        {
+            user = new ApplicationUser
+            {
+                UserName = payload.Email,
+                Email = payload.Email,
+                EmailConfirmed = true,
+                FullName = payload.Name ?? payload.Email,
+                AvatarUrl = payload.Picture,
+            };
+
+            var createResult = await _userManager.CreateAsync(user);
+            if (!createResult.Succeeded)
+            {
+                foreach (var error in createResult.Errors)
+                {
+                    ModelState.AddModelError(error.Code, error.Description);
+                }
+                return ValidationProblem(ModelState);
+            }
+        }
+        else
+        {
+            var updated = false;
+            if (!user.EmailConfirmed)
+            {
+                user.EmailConfirmed = true;
+                updated = true;
+            }
+            if (!string.IsNullOrWhiteSpace(payload.Name) && !string.Equals(user.FullName, payload.Name, StringComparison.Ordinal))
+            {
+                user.FullName = payload.Name;
+                updated = true;
+            }
+            if (!string.IsNullOrWhiteSpace(payload.Picture) && !string.Equals(user.AvatarUrl, payload.Picture, StringComparison.Ordinal))
+            {
+                user.AvatarUrl = payload.Picture;
+                updated = true;
+            }
+            if (updated)
+            {
+                await _userManager.UpdateAsync(user);
+            }
+        }
+
+        var loginInfo = new UserLoginInfo("Google", payload.Subject, "Google");
+        var existingLogin = await _userManager.FindByLoginAsync(loginInfo.LoginProvider, loginInfo.ProviderKey);
+        if (existingLogin == null)
+        {
+            var addLoginResult = await _userManager.AddLoginAsync(user, loginInfo);
+            if (!addLoginResult.Succeeded)
+            {
+                _logger.LogWarning("Failed to link Google login for user {Email}", user.Email);
+            }
+        }
+
+        await _signInManager.SignInAsync(user, isPersistent: false);
+
+        var response = await BuildAuthResponseAsync(user);
+        return Ok(response);
+    }
+
     [HttpPost("login")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(object))]  // Trả về { Token, UserId, Roles }
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -211,7 +328,14 @@ public class AuthController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        var user = await _userManager.FindByNameAsync(request.UserName);
+        var identifier = request.UserName.Trim();
+        var user = await _userManager.FindByNameAsync(identifier);
+
+        if (user == null && identifier.Contains("@", StringComparison.Ordinal))
+        {
+            user = await _userManager.FindByEmailAsync(identifier);
+        }
+
         if (user == null)
         {
             return Unauthorized("Thông tin đăng nhập không hợp lệ.");

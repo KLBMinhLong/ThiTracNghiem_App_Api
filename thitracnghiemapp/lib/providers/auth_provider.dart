@@ -71,14 +71,14 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> login({
-    required String userName,
+    required String identifier,
     required String password,
   }) async {
     _setLoading(true);
     _error = null;
     try {
       final response = await _authService.login(
-        userName: userName,
+        identifier: identifier,
         password: password,
       );
       await _persistSession(response);
@@ -113,6 +113,28 @@ class AuthProvider extends ChangeNotifier {
         password: password,
         fullName: fullName,
       );
+      await _persistSession(response);
+      _currentUser = response.user;
+      _setLoading(false);
+      return true;
+    } on ApiException catch (error) {
+      _error = error.message;
+      await _clearSession();
+      _setLoading(false);
+      return false;
+    } catch (error) {
+      _error = error.toString();
+      await _clearSession();
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  Future<bool> loginWithGoogle({required String idToken}) async {
+    _setLoading(true);
+    _error = null;
+    try {
+      final response = await _authService.loginWithGoogle(idToken: idToken);
       await _persistSession(response);
       _currentUser = response.user;
       _setLoading(false);

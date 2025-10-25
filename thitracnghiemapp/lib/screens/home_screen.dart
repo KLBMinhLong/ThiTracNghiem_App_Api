@@ -11,6 +11,7 @@ import '../providers/ket_qua_thi_provider.dart';
 import '../providers/lien_he_provider.dart';
 import 'admin/admin_dashboard_screen.dart';
 import 'exam_detail_screen.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -108,12 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 _ProfileTab(
                   onEditProfile: _showEditProfile,
                   onChangePassword: _showChangePassword,
-                  onLogout: () async {
-                    await context.read<AuthProvider>().logout();
-                    if (mounted) {
-                      Navigator.of(context).popUntil((route) => route.isFirst);
-                    }
-                  },
+                  onLogout: _confirmLogout,
                 ),
               ],
             ),
@@ -140,6 +136,40 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _confirmLogout(BuildContext dialogContext) async {
+    final shouldLogout = await showDialog<bool>(
+      context: dialogContext,
+      builder: (context) => AlertDialog(
+        title: const Text('Đăng xuất'),
+        content: const Text('Bạn có chắc chắn muốn đăng xuất?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Huỷ'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Đăng xuất'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout != true) {
+      return;
+    }
+
+    await dialogContext.read<AuthProvider>().logout();
+    if (!mounted) {
+      return;
+    }
+
+    Navigator.of(dialogContext).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
     );
   }
 
@@ -910,7 +940,7 @@ class _ContactTab extends StatelessWidget {
 class _ProfileTab extends StatelessWidget {
   final Future<void> Function(BuildContext) onEditProfile;
   final Future<void> Function(BuildContext) onChangePassword;
-  final Future<void> Function() onLogout;
+  final Future<void> Function(BuildContext) onLogout;
 
   const _ProfileTab({
     required this.onEditProfile,
@@ -1000,7 +1030,7 @@ class _ProfileTab extends StatelessWidget {
               ListTile(
                 leading: const Icon(Icons.logout),
                 title: const Text('Đăng xuất'),
-                onTap: () => onLogout(),
+                onTap: () => onLogout(context),
               ),
             ],
           ),

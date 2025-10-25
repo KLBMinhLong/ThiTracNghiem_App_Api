@@ -11,6 +11,7 @@ class KetQuaThiSummary {
   final DateTime? ngayNopBai;
   final DeThi? deThi;
   final User? taiKhoan;
+  final String? taiKhoanId;
 
   const KetQuaThiSummary({
     required this.id,
@@ -21,6 +22,7 @@ class KetQuaThiSummary {
     this.ngayNopBai,
     this.deThi,
     this.taiKhoan,
+    this.taiKhoanId,
   });
 
   bool get isCompleted =>
@@ -41,6 +43,7 @@ class KetQuaThiSummary {
       taiKhoan: json['taiKhoan'] is Map<String, dynamic>
           ? User.fromJson(json['taiKhoan'] as Map<String, dynamic>)
           : null,
+      taiKhoanId: json['taiKhoanId'] as String?,
     );
   }
 
@@ -54,6 +57,7 @@ class KetQuaThiSummary {
       'ngayNopBai': ngayNopBai?.toIso8601String(),
       if (deThi != null) 'deThi': deThi!.toJson(),
       if (taiKhoan != null) 'taiKhoan': taiKhoan!.toJson(),
+      if (taiKhoanId != null) 'taiKhoanId': taiKhoanId,
     };
   }
 
@@ -89,6 +93,7 @@ class KetQuaThiDetail extends KetQuaThiSummary {
     super.ngayNopBai,
     super.deThi,
     super.taiKhoan,
+    super.taiKhoanId,
     required this.tongSoCau,
     required this.chiTiet,
   });
@@ -108,6 +113,7 @@ class KetQuaThiDetail extends KetQuaThiSummary {
       ngayNopBai: summary.ngayNopBai,
       deThi: summary.deThi,
       taiKhoan: summary.taiKhoan,
+      taiKhoanId: summary.taiKhoanId,
       tongSoCau: tongSoCau,
       chiTiet: chiTietList,
     );

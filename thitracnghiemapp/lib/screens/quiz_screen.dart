@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 
 import '../models/de_thi.dart';
 import '../models/quiz_session.dart';
+import '../providers/auth_provider.dart';
+import '../providers/ket_qua_thi_provider.dart';
 import '../providers/thi_provider.dart';
 import 'result_screen.dart';
 
@@ -173,6 +175,10 @@ class _QuizScreenState extends State<QuizScreen> {
       return;
     }
     _timer?.cancel();
+    final ketQuaProvider = context.read<KetQuaThiProvider>();
+    final auth = context.read<AuthProvider>();
+    final onlyUserId = auth.currentUser?.id;
+    unawaited(ketQuaProvider.fetchKetQuaThiList(onlyUserId: onlyUserId));
     provider.reset();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(

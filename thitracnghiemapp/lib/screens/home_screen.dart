@@ -39,11 +39,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadInitialData() async {
+    final auth = context.read<AuthProvider>();
+    final onlyUserId = auth.currentUser?.id;
     try {
       await Future.wait([
         context.read<DeThiProvider>().fetchOpenDeThis(),
         context.read<ChuDeProvider>().fetchChuDes(),
-        context.read<KetQuaThiProvider>().fetchKetQuaThiList(),
+        context.read<KetQuaThiProvider>().fetchKetQuaThiList(
+          onlyUserId: onlyUserId,
+        ),
         context.read<LienHeProvider>().fetchMine(),
       ]);
     } finally {
@@ -96,7 +100,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-                _HistoryTab(onViewDetail: _showResultDetail),
+                _HistoryTab(
+                  onViewDetail: _showResultDetail,
+                  restrictToUserId: auth.currentUser?.id,
+                ),
                 _ContactTab(onCreate: _showCreateContact),
                 _ProfileTab(
                   onEditProfile: _showEditProfile,
@@ -168,75 +175,106 @@ class _HomeScreenState extends State<HomeScreen> {
     final titleController = TextEditingController();
     final contentController = TextEditingController();
     final hostContext = context;
-    final result = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
-            left: 16,
-            right: 16,
-            top: 24,
-          ),
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: titleController,
-                  decoration: const InputDecoration(labelText: 'Tiêu đề'),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Vui lòng nhập tiêu đề'
-                      : null,
+
+    try {
+      final formResult = await showModalBottomSheet<_ContactFormResult?>(
+        context: context,
+        isScrollControlled: true,
+        builder: (sheetContext) {
+          final viewInsets = MediaQuery.of(sheetContext).viewInsets;
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: viewInsets.bottom + 24,
+                left: 16,
+                right: 16,
+                top: 24,
+              ),
+              child: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: titleController,
+                        decoration: const InputDecoration(labelText: 'Tiêu đề'),
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                            ? 'Vui lòng nhập tiêu đề'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: contentController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nội dung',
+                        ),
+                        minLines: 3,
+                        maxLines: 6,
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                            ? 'Vui lòng nhập nội dung'
+                            : null,
+                      ),
+                      const SizedBox(height: 24),
+                      FilledButton(
+                        onPressed: () {
+                          if (!formKey.currentState!.validate()) {
+                            return;
+                          }
+                          FocusScope.of(sheetContext).unfocus();
+                          if (!sheetContext.mounted) {
+                            return;
+                          }
+                          Navigator.of(sheetContext).pop(
+                            _ContactFormResult(
+                              title: titleController.text.trim(),
+                              content: contentController.text.trim(),
+                            ),
+                          );
+                        },
+                        child: const Text('Gửi liên hệ'),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: contentController,
-                  decoration: const InputDecoration(labelText: 'Nội dung'),
-                  minLines: 3,
-                  maxLines: 6,
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Vui lòng nhập nội dung'
-                      : null,
-                ),
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: () async {
-                    if (!formKey.currentState!.validate()) {
-                      return;
-                    }
-                    await lienHeProvider.createLienHe(
-                      tieuDe: titleController.text.trim(),
-                      noiDung: contentController.text.trim(),
-                    );
-                    if (!mounted) {
-                      return;
-                    }
-                    final error = lienHeProvider.error;
-                    if (error != null) {
-                      ScaffoldMessenger.of(
-                        hostContext,
-                      ).showSnackBar(SnackBar(content: Text(error)));
-                      return;
-                    }
-                    Navigator.of(sheetContext).pop(true);
-                  },
-                  child: const Text('Gửi liên hệ'),
-                ),
-                const SizedBox(height: 24),
-              ],
+              ),
             ),
-          ),
-        );
-      },
-    );
-    _disposeTextControllers([titleController, contentController]);
-    if (result == true && mounted) {
+          );
+        },
+      );
+
+      if (!mounted || formResult == null) {
+        return;
+      }
+
+      await Future<void>.delayed(Duration.zero);
+      if (!mounted) {
+        return;
+      }
+
+      await lienHeProvider.createLienHe(
+        tieuDe: formResult.title,
+        noiDung: formResult.content,
+      );
+
+      if (!mounted) {
+        return;
+      }
+      final error = lienHeProvider.error;
+      if (error != null) {
+        ScaffoldMessenger.of(
+          hostContext,
+        ).showSnackBar(SnackBar(content: Text(error)));
+        return;
+      }
       ScaffoldMessenger.of(hostContext).showSnackBar(
         const SnackBar(content: Text('Đã gửi liên hệ thành công')),
       );
+    } finally {
+      titleController.dispose();
+      contentController.dispose();
     }
   }
 
@@ -634,15 +672,17 @@ class _ExamTab extends StatelessWidget {
 
 class _HistoryTab extends StatelessWidget {
   final ValueChanged<KetQuaThiSummary> onViewDetail;
+  final String? restrictToUserId;
 
-  const _HistoryTab({required this.onViewDetail});
+  const _HistoryTab({required this.onViewDetail, this.restrictToUserId});
 
   @override
   Widget build(BuildContext context) {
     return Consumer<KetQuaThiProvider>(
       builder: (context, provider, _) {
         return RefreshIndicator(
-          onRefresh: () => provider.fetchKetQuaThiList(),
+          onRefresh: () =>
+              provider.fetchKetQuaThiList(onlyUserId: restrictToUserId),
           child: provider.isLoading
               ? ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
@@ -652,8 +692,19 @@ class _HistoryTab extends StatelessWidget {
                   ],
                 )
               : (() {
-                  final items = provider.ketQuaThiList?.items;
-                  if (items == null || items.isEmpty) {
+                  final rawItems = provider.ketQuaThiList?.items;
+                  List<KetQuaThiSummary>? items = rawItems;
+                  if (restrictToUserId != null && rawItems != null) {
+                    items = rawItems
+                        .where((summary) {
+                          final ownerId =
+                              summary.taiKhoan?.id ?? summary.taiKhoanId;
+                          return ownerId == null || ownerId == restrictToUserId;
+                        })
+                        .toList(growable: false);
+                  }
+                  final list = items;
+                  if (list == null || list.isEmpty) {
                     return ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.symmetric(
@@ -673,10 +724,10 @@ class _HistoryTab extends StatelessWidget {
                   return ListView.separated(
                     padding: const EdgeInsets.all(16),
                     physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: items.length,
+                    itemCount: list.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
-                      final summary = items[index];
+                      final summary = list[index];
                       final statusColor = summary.isCompleted
                           ? Colors.green
                           : Theme.of(context).colorScheme.secondary;
@@ -715,6 +766,13 @@ class _HistoryTab extends StatelessWidget {
   }
 }
 
+class _ContactFormResult {
+  final String title;
+  final String content;
+
+  const _ContactFormResult({required this.title, required this.content});
+}
+
 class _ContactTab extends StatelessWidget {
   final Future<void> Function(BuildContext) onCreate;
 
@@ -725,10 +783,7 @@ class _ContactTab extends StatelessWidget {
     return Consumer<LienHeProvider>(
       builder: (context, provider, _) {
         return RefreshIndicator(
-          onRefresh: () async {
-            await provider.fetchMine();
-            await provider.fetchAll();
-          },
+          onRefresh: () => provider.fetchMine(),
           child: () {
             if (provider.isLoading && provider.myLienHe == null) {
               return ListView(
@@ -793,30 +848,41 @@ class _ContactTab extends StatelessWidget {
                   confirmDismiss: (_) async {
                     final confirm = await showDialog<bool>(
                       context: context,
-                      builder: (context) => AlertDialog(
+                      builder: (dialogContext) => AlertDialog(
                         title: const Text('Xoá liên hệ'),
                         content: const Text(
                           'Bạn có chắc muốn xoá liên hệ này?',
                         ),
                         actions: [
                           TextButton(
-                            onPressed: () => Navigator.of(context).pop(false),
+                            onPressed: () =>
+                                Navigator.of(dialogContext).pop(false),
                             child: const Text('Huỷ'),
                           ),
                           FilledButton(
-                            onPressed: () => Navigator.of(context).pop(true),
+                            onPressed: () =>
+                                Navigator.of(dialogContext).pop(true),
                             child: const Text('Xoá'),
                           ),
                         ],
                       ),
                     );
-                    return confirm ?? false;
-                  },
-                  onDismissed: (_) async {
-                    await provider.deleteLienHe(lienHe.id);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Đã xoá liên hệ')),
-                    );
+                    if (confirm != true) {
+                      return false;
+                    }
+                    final messenger = ScaffoldMessenger.of(context);
+                    final success = await provider.deleteLienHe(lienHe.id);
+                    if (success) {
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text('Đã xoá liên hệ')),
+                      );
+                    } else {
+                      final message =
+                          provider.error ??
+                          'Không thể xoá liên hệ. Vui lòng thử lại.';
+                      messenger.showSnackBar(SnackBar(content: Text(message)));
+                    }
+                    return success;
                   },
                   background: Container(
                     alignment: Alignment.centerRight,

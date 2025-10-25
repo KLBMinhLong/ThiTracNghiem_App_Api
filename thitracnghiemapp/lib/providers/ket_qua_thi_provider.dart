@@ -20,13 +20,28 @@ class KetQuaThiProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  Future<void> fetchKetQuaThiList({int page = 1}) async {
+  String? _lastFilterUserId;
+
+  Future<void> fetchKetQuaThiList({int page = 1, String? onlyUserId}) async {
     _isLoading = true;
     _error = null;
+    _lastFilterUserId = onlyUserId;
     notifyListeners();
 
     try {
       _ketQuaThiList = await _service.fetchKetQuaThis(page: page);
+      if (onlyUserId != null) {
+        final filtered = _ketQuaThiList!.items
+            .where((item) {
+              final ownerId = item.taiKhoan?.id ?? item.taiKhoanId;
+              return ownerId == null || ownerId == onlyUserId;
+            })
+            .toList(growable: false);
+        _ketQuaThiList = _ketQuaThiList!.copyWith(
+          items: filtered,
+          total: filtered.length,
+        );
+      }
     } on ApiException catch (e) {
       _error = e.message;
     } catch (e) {
@@ -35,6 +50,13 @@ class KetQuaThiProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> refetchWithLastFilter() async {
+    await fetchKetQuaThiList(
+      page: _ketQuaThiList?.page ?? 1,
+      onlyUserId: _lastFilterUserId,
+    );
   }
 
   Future<void> fetchKetQuaThi(int id) async {

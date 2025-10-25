@@ -88,11 +88,12 @@ class LienHeProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> deleteLienHe(int id) async {
+  Future<bool> deleteLienHe(int id) async {
     _error = null;
     _isLoading = true;
     notifyListeners();
 
+    var success = false;
     try {
       await _service.deleteLienHe(id);
       final mine = _myLienHe;
@@ -109,6 +110,7 @@ class LienHeProvider extends ChangeNotifier {
           total: all.total > 0 ? all.total - 1 : 0,
         );
       }
+      success = true;
     } on ApiException catch (e) {
       _error = e.message;
     } catch (e) {
@@ -117,6 +119,7 @@ class LienHeProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+    return success;
   }
 
   void clear() {

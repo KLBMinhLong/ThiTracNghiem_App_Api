@@ -26,9 +26,22 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadComments();
-      context.read<DeThiProvider>().fetchOpenDeThis();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future.wait([
+        _loadComments(),
+        context.read<DeThiProvider>().fetchOpenDeThis(),
+      ]);
+      if (!mounted) {
+        return;
+      }
+      final commentError = context.read<BinhLuanProvider>().error;
+      final deThiError = context.read<DeThiProvider>().error;
+      if (commentError != null) {
+        _showToast(commentError);
+      }
+      if (deThiError != null) {
+        _showToast(deThiError);
+      }
     });
   }
 
@@ -247,21 +260,32 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     }
     setState(() => _sendingComment = true);
     final provider = context.read<BinhLuanProvider>();
-    await provider.createComment(deThiId: widget.deThi.id, noiDung: content);
-    setState(() => _sendingComment = false);
-    if (!mounted) {
-      return;
-    }
-    if (provider.error != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(provider.error!)));
-    } else {
+    try {
+      await provider.createComment(deThiId: widget.deThi.id, noiDung: content);
+      final error = provider.error;
+      if (error != null) {
+        if (!mounted) {
+          return;
+        }
+        _showToast(error);
+        return;
+      }
+      await _loadComments();
+      if (!mounted) {
+        return;
+      }
       _commentController.clear();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Đã đăng bình luận')));
+      _showToast('Đã đăng bình luận');
+    } finally {
+      if (mounted) {
+        setState(() => _sendingComment = false);
+      }
     }
+  }
+
+  void _showToast(String message) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

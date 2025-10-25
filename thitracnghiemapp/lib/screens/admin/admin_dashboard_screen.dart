@@ -696,11 +696,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
     if (confirm == true) {
-      await provider.deleteChuDe(id);
-      if (mounted) {
+      final ok = await provider.deleteChuDe(id);
+      if (!mounted) {
+        return;
+      }
+      if (ok) {
+        await provider.fetchChuDes();
+        if (!mounted) {
+          return;
+        }
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Đã xoá chủ đề')));
+      } else {
+        final message =
+            provider.error ?? 'Không thể xoá chủ đề vì đang được sử dụng.';
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
       }
     }
   }
@@ -902,7 +915,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _deleteQuestion(int id) async {
-    final provider = context.read<CauHoiProvider>();
+    final questionProvider = context.read<CauHoiProvider>();
+    final examProvider = context.read<DeThiProvider>();
+    CauHoi? target;
+    for (final item in questionProvider.cauHois) {
+      if (item.id == id) {
+        target = item;
+        break;
+      }
+    }
+    if (target == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không tìm thấy câu hỏi để xoá.')),
+        );
+      }
+      return;
+    }
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -921,11 +950,53 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
     if (confirm == true) {
-      await provider.deleteCauHoi(id);
-      if (mounted) {
+      final topicId = target.chuDeId;
+      final currentCount = questionProvider.cauHois
+          .where((question) => question.chuDeId == topicId)
+          .length;
+      final remaining = currentCount - 1;
+      final exams = <DeThi>[];
+      if (examProvider.adminDeThis?.items != null) {
+        exams.addAll(examProvider.adminDeThis!.items);
+      }
+      exams.addAll(examProvider.openDeThis);
+
+      DeThi? blockingExam;
+      for (final exam in exams) {
+        if (exam.chuDeId == topicId && exam.soCauHoi > remaining) {
+          if (blockingExam == null || exam.soCauHoi > blockingExam.soCauHoi) {
+            blockingExam = exam;
+          }
+        }
+      }
+
+      if (blockingExam != null) {
+        if (mounted) {
+          final available = remaining < 0 ? 0 : remaining;
+          final message =
+              'Không thể xoá câu hỏi vì đề thi "${blockingExam.tenDeThi}" yêu cầu ${blockingExam.soCauHoi} câu nhưng chủ đề chỉ còn $available câu hỏi.';
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(message)));
+        }
+        return;
+      }
+
+      final ok = await questionProvider.deleteCauHoi(id);
+      if (!mounted) {
+        return;
+      }
+      if (ok) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Đã xoá câu hỏi')));
+      } else {
+        final message =
+            questionProvider.error ??
+            'Không thể xoá câu hỏi. Vui lòng thử lại.';
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
       }
     }
   }
@@ -1091,12 +1162,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
     if (confirm == true) {
-      await examProvider.deleteDeThi(id);
+      final ok = await examProvider.deleteDeThi(id);
       await examProvider.fetchAdminDeThis(page: _examPage);
-      if (mounted) {
+      if (!mounted) {
+        return;
+      }
+      if (ok) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Đã xoá đề thi')));
+      } else {
+        final message =
+            examProvider.error ?? 'Không thể xoá đề thi vì đang được sử dụng.';
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
       }
     }
   }
@@ -1121,12 +1201,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
     );
     if (confirm == true) {
-      await provider.deleteLienHe(id);
-      await provider.fetchAll();
-      if (mounted) {
+      final success = await provider.deleteLienHe(id);
+      if (success) {
+        await provider.fetchAll();
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Đã xoá liên hệ')));
+        }
+      } else if (mounted) {
+        final message =
+            provider.error ?? 'Không thể xoá liên hệ. Vui lòng thử lại sau.';
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Đã xoá liên hệ')));
+        ).showSnackBar(SnackBar(content: Text(message)));
       }
     }
   }

@@ -159,6 +159,11 @@ class _LoginScreenState extends State<LoginScreen> {
         clientId: Platform.isIOS ? serverClientId : null,
         serverClientId: serverClientId,
       );
+      try {
+        await googleSignIn.disconnect();
+      } catch (_) {
+        // Ignore if there is no previous session to disconnect
+      }
       await googleSignIn.signOut();
       final account = await googleSignIn.signIn();
       if (account == null) {

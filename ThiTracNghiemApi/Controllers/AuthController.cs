@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -218,19 +219,32 @@ public class AuthController : ControllerBase
             return BadRequest("Token Google không hợp lệ.");
         }
 
-        var clientIdConfig = _config["Google:ClientId"]
-            ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID");
-        if (string.IsNullOrWhiteSpace(clientIdConfig))
+        var audiences = new HashSet<string>(StringComparer.Ordinal);
+
+        void AddAudiences(string? value)
         {
-            _logger.LogError("Google:ClientId is not configured.");
-            return StatusCode(StatusCodes.Status500InternalServerError, "Máy chủ chưa cấu hình đăng nhập Google.");
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            foreach (var part in value.Split(new[] { ';', ',', ' ' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                audiences.Add(part);
+            }
         }
 
-        var audiences = clientIdConfig
-            .Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (audiences.Length == 0)
+        AddAudiences(_config["Google:ClientId"]);
+        AddAudiences(Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID"));
+        AddAudiences(Environment.GetEnvironmentVariable("GOOGLE__CLIENTID"));
+        AddAudiences(_config["Google:AllowedAudiences"]);
+        AddAudiences(_config["Google:AndroidClientId"]);
+        AddAudiences(Environment.GetEnvironmentVariable("GOOGLE_ANDROID_CLIENT_ID"));
+        AddAudiences(Environment.GetEnvironmentVariable("GOOGLE__ANDROIDCLIENTID"));
+
+        if (audiences.Count == 0)
         {
-            _logger.LogError("Google:ClientId configuration does not contain any valid client ids.");
+            _logger.LogError("Google client id configuration does not contain any valid client ids.");
             return StatusCode(StatusCodes.Status500InternalServerError, "Máy chủ chưa cấu hình đăng nhập Google.");
         }
 
@@ -241,7 +255,7 @@ public class AuthController : ControllerBase
                 request.IdToken,
                 new GoogleJsonWebSignature.ValidationSettings
                 {
-                    Audience = audiences
+                    Audience = audiences.ToArray()
                 });
         }
         catch (InvalidJwtException ex)

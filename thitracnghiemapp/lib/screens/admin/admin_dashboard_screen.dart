@@ -1286,97 +1286,119 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       text: exam?.thoiGianThi.toString() ?? '0',
     );
     String status = exam?.trangThai ?? 'Mo';
+    bool allowMultipleAttempts = exam?.allowMultipleAttempts ?? true;
     int selectedTopicId =
         exam?.chuDeId ?? (topics.isNotEmpty ? topics.first.id : 0);
+    if (selectedTopicId == 0 && topics.isNotEmpty) {
+      selectedTopicId = topics.first.id;
+    }
+
     final dialogResult = await showDialog<_ExamDialogResult?>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(exam == null ? 'Thêm đề thi' : 'Cập nhật đề thi'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<int>(
-                initialValue: selectedTopicId == 0 && topics.isNotEmpty
-                    ? topics.first.id
-                    : selectedTopicId,
-                items: [
-                  for (final topic in topics)
-                    DropdownMenuItem(
-                      value: topic.id,
-                      child: Text(topic.tenChuDe),
-                    ),
-                ],
-                onChanged: (value) =>
-                    selectedTopicId = value ?? selectedTopicId,
-                decoration: const InputDecoration(labelText: 'Chủ đề'),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Tên đề thi'),
-                validator: (value) => value == null || value.trim().isEmpty
-                    ? 'Nhập tên đề thi'
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: questionCountController,
-                decoration: const InputDecoration(labelText: 'Số câu hỏi'),
-                keyboardType: TextInputType.number,
-                validator: (value) => int.tryParse(value ?? '') == null
-                    ? 'Nhập số câu hỏi hợp lệ'
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: durationController,
-                decoration: const InputDecoration(
-                  labelText: 'Thời gian thi (phút)',
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setState) => AlertDialog(
+          title: Text(exam == null ? 'Thêm đề thi' : 'Cập nhật đề thi'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<int>(
+                  value: selectedTopicId,
+                  items: [
+                    for (final topic in topics)
+                      DropdownMenuItem(
+                        value: topic.id,
+                        child: Text(topic.tenChuDe),
+                      ),
+                  ],
+                  onChanged: (value) => setState(
+                    () => selectedTopicId = value ?? selectedTopicId,
+                  ),
+                  decoration: const InputDecoration(labelText: 'Chủ đề'),
                 ),
-                keyboardType: TextInputType.number,
-                validator: (value) => int.tryParse(value ?? '') == null
-                    ? 'Nhập thời gian hợp lệ'
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: status,
-                decoration: const InputDecoration(labelText: 'Trạng thái'),
-                items: const [
-                  DropdownMenuItem(value: 'Mo', child: Text('Mở')),
-                  DropdownMenuItem(value: 'Dong', child: Text('Đóng')),
-                ],
-                onChanged: (value) => status = value ?? status,
-              ),
-            ],
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Tên đề thi'),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Nhập tên đề thi'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: questionCountController,
+                  decoration: const InputDecoration(labelText: 'Số câu hỏi'),
+                  keyboardType: TextInputType.number,
+                  validator: (value) => int.tryParse(value ?? '') == null
+                      ? 'Nhập số câu hỏi hợp lệ'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: durationController,
+                  decoration: const InputDecoration(
+                    labelText: 'Thời gian thi (phút)',
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) => int.tryParse(value ?? '') == null
+                      ? 'Nhập thời gian hợp lệ'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: status,
+                  decoration: const InputDecoration(labelText: 'Trạng thái'),
+                  items: const [
+                    DropdownMenuItem(value: 'Mo', child: Text('Mở')),
+                    DropdownMenuItem(value: 'Dong', child: Text('Đóng')),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => status = value ?? status),
+                ),
+                const SizedBox(height: 12),
+                CheckboxListTile(
+                  value: allowMultipleAttempts,
+                  onChanged: (value) => setState(
+                    () =>
+                        allowMultipleAttempts = value ?? allowMultipleAttempts,
+                  ),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text('Cho phép thí sinh thi nhiều lần'),
+                  subtitle: const Text(
+                    'Nếu tắt, mỗi tài khoản chỉ được thi và nộp bài một lần.',
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(null),
+              child: const Text('Huỷ'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (!formKey.currentState!.validate()) return;
+                FocusScope.of(dialogContext).unfocus();
+                if (!dialogContext.mounted) return;
+                Navigator.of(dialogContext).pop(
+                  _ExamDialogResult(
+                    id: exam?.id,
+                    tenDeThi: nameController.text.trim(),
+                    chuDeId: selectedTopicId,
+                    soCauHoi: int.parse(questionCountController.text),
+                    thoiGianThi: int.parse(durationController.text),
+                    trangThai: status,
+                    allowMultipleAttempts: allowMultipleAttempts,
+                  ),
+                );
+              },
+              child: const Text('Lưu'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(null),
-            child: const Text('Huỷ'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              FocusScope.of(dialogContext).unfocus();
-              if (!dialogContext.mounted) return;
-              Navigator.of(dialogContext).pop(
-                _ExamDialogResult(
-                  id: exam?.id,
-                  tenDeThi: nameController.text.trim(),
-                  chuDeId: selectedTopicId,
-                  soCauHoi: int.parse(questionCountController.text),
-                  thoiGianThi: int.parse(durationController.text),
-                  trangThai: status,
-                ),
-              );
-            },
-            child: const Text('Lưu'),
-          ),
-        ],
       ),
     );
 
@@ -1392,6 +1414,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         soCauHoi: dialogResult.soCauHoi,
         thoiGianThi: dialogResult.thoiGianThi,
         trangThai: dialogResult.trangThai,
+        allowMultipleAttempts: dialogResult.allowMultipleAttempts,
       );
     } else {
       await examProvider.createDeThi(
@@ -1400,6 +1423,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         soCauHoi: dialogResult.soCauHoi,
         thoiGianThi: dialogResult.thoiGianThi,
         trangThai: dialogResult.trangThai,
+        allowMultipleAttempts: dialogResult.allowMultipleAttempts,
       );
     }
 
@@ -1540,6 +1564,7 @@ class _ExamDialogResult {
   final int soCauHoi;
   final int thoiGianThi;
   final String trangThai;
+  final bool allowMultipleAttempts;
 
   const _ExamDialogResult({
     this.id,
@@ -1548,6 +1573,7 @@ class _ExamDialogResult {
     required this.soCauHoi,
     required this.thoiGianThi,
     required this.trangThai,
+    required this.allowMultipleAttempts,
   });
 
   bool get isUpdate => id != null;

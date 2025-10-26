@@ -55,6 +55,7 @@ class DeThiProvider extends ChangeNotifier {
     required int soCauHoi,
     required int thoiGianThi,
     String trangThai = 'Mo',
+    bool allowMultipleAttempts = false,
   }) async {
     try {
       final result = await _service.createDeThi(
@@ -63,6 +64,7 @@ class DeThiProvider extends ChangeNotifier {
         soCauHoi: soCauHoi,
         thoiGianThi: thoiGianThi,
         trangThai: trangThai,
+        allowMultipleAttempts: allowMultipleAttempts,
       );
       if (result.isOpen) {
         _openDeThis = List<DeThi>.from(_openDeThis)..add(result);
@@ -83,6 +85,7 @@ class DeThiProvider extends ChangeNotifier {
     required int soCauHoi,
     required int thoiGianThi,
     required String trangThai,
+    bool allowMultipleAttempts = false,
   }) async {
     try {
       await _service.updateDeThi(
@@ -92,6 +95,7 @@ class DeThiProvider extends ChangeNotifier {
         soCauHoi: soCauHoi,
         thoiGianThi: thoiGianThi,
         trangThai: trangThai,
+        allowMultipleAttempts: allowMultipleAttempts,
       );
       _openDeThis = _openDeThis
           .map(
@@ -105,6 +109,7 @@ class DeThiProvider extends ChangeNotifier {
                     thoiGianThi: thoiGianThi,
                     trangThai: trangThai,
                     ngayTao: deThi.ngayTao,
+                    allowMultipleAttempts: allowMultipleAttempts,
                   )
                 : deThi,
           )

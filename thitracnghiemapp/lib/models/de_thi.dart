@@ -9,6 +9,7 @@ class DeThi {
   final int thoiGianThi;
   final String trangThai;
   final DateTime ngayTao;
+  final bool allowMultipleAttempts;
 
   const DeThi({
     required this.id,
@@ -19,6 +20,7 @@ class DeThi {
     required this.thoiGianThi,
     required this.trangThai,
     required this.ngayTao,
+    required this.allowMultipleAttempts,
   });
 
   bool get isOpen => trangThai.toLowerCase() == 'mo';
@@ -35,6 +37,7 @@ class DeThi {
       thoiGianThi: json['thoiGianThi'] as int? ?? 0,
       trangThai: json['trangThai'] as String? ?? '',
       ngayTao: _parseDate(json['ngayTao']),
+      allowMultipleAttempts: json['allowMultipleAttempts'] as bool? ?? false,
     );
   }
 
@@ -89,6 +92,7 @@ class DeThi {
       'thoiGianThi': thoiGianThi,
       'trangThai': trangThai,
       'ngayTao': ngayTao.toIso8601String(),
+      'allowMultipleAttempts': allowMultipleAttempts,
       if (chuDe != null) 'chuDe': chuDe!.toJson(),
     };
   }

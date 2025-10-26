@@ -59,6 +59,7 @@ class DeThiService {
     required int soCauHoi,
     required int thoiGianThi,
     String trangThai = 'Mo',
+    bool allowMultipleAttempts = false,
   }) async {
     final payload = {
       'tenDeThi': tenDeThi,
@@ -66,6 +67,7 @@ class DeThiService {
       'soCauHoi': soCauHoi,
       'thoiGianThi': thoiGianThi,
       'trangThai': trangThai,
+      'allowMultipleAttempts': allowMultipleAttempts,
     };
     final response = await _client.post('/api/DeThi', body: payload);
     if (response is! Map<String, dynamic>) {
@@ -81,6 +83,7 @@ class DeThiService {
     required int soCauHoi,
     required int thoiGianThi,
     required String trangThai,
+    bool allowMultipleAttempts = false,
   }) async {
     final payload = {
       'id': id,
@@ -89,6 +92,7 @@ class DeThiService {
       'soCauHoi': soCauHoi,
       'thoiGianThi': thoiGianThi,
       'trangThai': trangThai,
+      'allowMultipleAttempts': allowMultipleAttempts,
     };
     await _client.put('/api/DeThi/$id', body: payload);
   }

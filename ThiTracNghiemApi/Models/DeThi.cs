@@ -17,6 +17,11 @@ namespace ThiTracNghiemApi
         public int ThoiGianThi { get; set; }  // Phút
         [Required]
         public string TrangThai { get; set; } = "Mo";  // "Mo" or "Dong"
+    /// <summary>
+    /// Nếu true thì người dùng có thể làm đề thi này nhiều lần.
+    /// Nếu false (mặc định) thì người dùng chỉ được làm một lần (nếu đã hoàn thành sẽ bị chặn).
+    /// </summary>
+    public bool AllowMultipleAttempts { get; set; } = true;
         public DateTime NgayTao { get; set; } = DateTime.UtcNow;
         public ICollection<KetQuaThi> KetQuaThis { get; set; } = new List<KetQuaThi>();
         public ICollection<BinhLuan> BinhLuans { get; set; } = new List<BinhLuan>();

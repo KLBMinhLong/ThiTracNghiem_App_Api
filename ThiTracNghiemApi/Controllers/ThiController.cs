@@ -71,7 +71,8 @@ public class ThiController : ControllerBase
             });
         }
 
-        if (await _context.KetQuaThis.AnyAsync(k => k.TaiKhoanId == userId && k.DeThiId == deThiId && k.TrangThai == "HoanThanh"))
+        // Nếu đề thi không cho phép làm lại và người dùng đã hoàn thành trước đó -> chặn
+        if (!deThi.AllowMultipleAttempts && await _context.KetQuaThis.AnyAsync(k => k.TaiKhoanId == userId && k.DeThiId == deThiId && k.TrangThai == "HoanThanh"))
         {
             return BadRequest("Bạn đã hoàn thành đề thi này.");
         }

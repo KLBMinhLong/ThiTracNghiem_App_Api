@@ -97,8 +97,12 @@ public class CauHoiController : ControllerBase
     // Import từ Excel (giống web cũ)
     [HttpPost("import")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> ImportCauHois([FromForm] IFormFile file, [FromForm] int topicId)
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> ImportCauHois([FromForm] ThiTracNghiemApi.Dtos.CauHoi.ImportCauHoisRequest request)
     {
+        var file = request?.File;
+        var topicId = request?.TopicId ?? 0;
+
         if (file == null || file.Length == 0)
         {
             return BadRequest("File không hợp lệ.");

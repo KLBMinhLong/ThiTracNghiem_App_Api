@@ -38,16 +38,21 @@ ThiTracNghiem_App_Api/
 4. (Tuy chon) Tao nguoi dung admin dau tien bang cach goi endpoint dang ky va cap quyen, hoac chen truc tiep trong DB.
 
 ## Cai dat ung dung Flutter (thitracnghiemapp)
-1. Tao file moi `thitracnghiemapp/.env` neu chua ton tai:
+1. Tao file moi `thitracnghiemapp/.env` (co the copy tu `.env.example`):
    ```
-   API_BASE_URL=http://localhost:5103
+   BASE_URL=http://localhost:5103
+   GOOGLE_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
    ```
-   Dieu chinh URL phu hop voi moi truong cua ban (dev/test/prod).
-2. Cai dependencies:
+   - `BASE_URL`: khong co dau `/` cuoi.
+   - `GOOGLE_CLIENT_ID`: phai la Web Client ID (Google OAuth), ket thuc bang `.apps.googleusercontent.com`.
+2. Khoi phuc cac file bi bo qua (generated/ephemeral):
+   - Chay cac lenh sau de Flutter tu dong sinh file thieu (`.dart_tool`, `.flutter-plugins*`, `generated_plugin_registrant.dart`, Pods, ...).
    ```powershell
    cd thitracnghiemapp
-   flutter pub get
+   flutter clean ; flutter pub get
+   # (Tuy chon neu dung codegen) dart run build_runner build --delete-conflicting-outputs
    ```
+   - Android: file `android/local.properties` se duoc tao boi Android tooling. Neu chua co, mo project bang Android Studio mot lan hoac tu tao file voi `sdk.dir` tro den thu muc Android SDK.
 3. Chay ung dung:
    ```powershell
    flutter run
@@ -63,7 +68,17 @@ ThiTracNghiem_App_Api/
 
 ## Bien moi truong & file bi bo qua
 - `.env` (Flutter) va `appsettings*.json` (API) khong duoc commit theo `.gitignore`.
-- Neu can chia se thong tin mau, tao file `.env.example` va `appsettings.Development.json.example`.
+- Da kem san: `thitracnghiemapp/.env.example` va `ThiTracNghiemApi/appsettings.Development.example.json` de ban sao chep.
+
+### Ghi chu Google Sign-In (Android)
+- Trong Google Cloud Console, tao 2 OAuth client:
+   1) Web application (dung de xac thuc voi server) — su dung lam `GOOGLE_CLIENT_ID` trong `.env`.
+   2) Android application (package: `com.example.thitracnghiemapp`, SHA-1 debug) — giup app Android dang nhap thanh cong.
+- Neu gap loi `ApiException: 10` khi dang nhap Google, kiem tra lai package name, SHA-1 va client ID.
+
+### Ghi chu Windows Desktop
+- Bat Developer Mode de cho phep symlink (yeu cau cho mot so plugin): Settings → For developers → Developer Mode.
+- Cai Visual Studio workload “Desktop development with C++” (MSVC, CMake, Windows 10/11 SDK) de build Windows.
 
 ## Lenh huu ich
 | Tac vu                        | Lenh |

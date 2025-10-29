@@ -365,10 +365,149 @@ public class AuthController : ControllerBase
             return Unauthorized("Thông tin đăng nhập không hợp lệ.");
         }
 
+        // If user enabled TOTP, require second factor
+        if (user.TwoFactorEnabled)
+        {
+            return Ok(new { requiresTwoFactor = true, userId = user.Id });
+        }
+
         await _signInManager.SignInAsync(user, false);
 
         var response = await BuildAuthResponseAsync(user);
         return Ok(response);
+    }
+
+    [AllowAnonymous]
+    [HttpPost("login-2fa")]
+    public async Task<IActionResult> LoginWith2Fa([FromBody] TwoFaLoginRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var user = await _userManager.FindByIdAsync(request.UserId);
+        if (user == null)
+        {
+            return Unauthorized("Thông tin đăng nhập không hợp lệ.");
+        }
+
+        if (!user.TwoFactorEnabled)
+        {
+            return BadRequest("Tài khoản chưa bật xác thực 2 bước.");
+        }
+
+        var code = request.Code.Replace(" ", string.Empty).Replace("-", string.Empty);
+        var is2FaTokenValid = await _userManager.VerifyTwoFactorTokenAsync(
+            user,
+            _userManager.Options.Tokens.AuthenticatorTokenProvider,
+            code
+        );
+
+        if (!is2FaTokenValid)
+        {
+            return Unauthorized("Mã xác thực 2 bước không hợp lệ.");
+        }
+
+        await _signInManager.SignInAsync(user, false);
+        var response = await BuildAuthResponseAsync(user);
+        return Ok(response);
+    }
+
+    [Authorize]
+    [HttpGet("2fa/status")]
+    public async Task<ActionResult<TwoFaStatusResponse>> GetTwoFaStatus()
+    {
+        var user = await GetCurrentUserEntityAsync();
+        if (user == null) return Unauthorized();
+        return Ok(new TwoFaStatusResponse { Enabled = user.TwoFactorEnabled });
+    }
+
+    [Authorize]
+    [HttpGet("2fa/setup")]
+    public async Task<ActionResult<TwoFaSetupResponse>> SetupTwoFa()
+    {
+        var user = await GetCurrentUserEntityAsync();
+        if (user == null) return Unauthorized();
+
+        var key = await _userManager.GetAuthenticatorKeyAsync(user);
+        if (string.IsNullOrEmpty(key))
+        {
+            await _userManager.ResetAuthenticatorKeyAsync(user);
+            key = await _userManager.GetAuthenticatorKeyAsync(user);
+        }
+
+        var formattedKey = FormatKey(key);
+        var issuer = _config["Jwt:Issuer"] ?? "ThiTracNghiem";
+        var email = user.Email ?? user.UserName ?? user.Id;
+    var otpauthUri = GenerateOtpAuthUri(issuer, email, key ?? string.Empty);
+
+        return Ok(new TwoFaSetupResponse
+        {
+            SharedKey = formattedKey,
+            AuthenticatorUri = otpauthUri,
+            Enabled = user.TwoFactorEnabled
+        });
+    }
+
+    [Authorize]
+    [HttpPost("2fa/enable")]
+    public async Task<IActionResult> EnableTwoFa([FromBody] TwoFaEnableRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var user = await GetCurrentUserEntityAsync();
+        if (user == null) return Unauthorized();
+
+        var code = request.Code.Replace(" ", string.Empty).Replace("-", string.Empty);
+        var isValid = await _userManager.VerifyTwoFactorTokenAsync(
+            user,
+            _userManager.Options.Tokens.AuthenticatorTokenProvider,
+            code
+        );
+        if (!isValid)
+        {
+            return BadRequest("Mã xác thực không hợp lệ.");
+        }
+
+        await _userManager.SetTwoFactorEnabledAsync(user, true);
+        return NoContent();
+    }
+
+    [Authorize]
+    [HttpPost("2fa/disable")]
+    public async Task<IActionResult> DisableTwoFa()
+    {
+        var user = await GetCurrentUserEntityAsync();
+        if (user == null) return Unauthorized();
+        await _userManager.SetTwoFactorEnabledAsync(user, false);
+        return NoContent();
+    }
+
+    private static string FormatKey(string? key)
+    {
+        if (string.IsNullOrEmpty(key)) return string.Empty;
+        var result = new System.Text.StringBuilder();
+        int currentPosition = 0;
+        while (currentPosition + 4 < key.Length)
+        {
+            result.Append(key.AsSpan(currentPosition, 4)).Append(' ');
+            currentPosition += 4;
+        }
+        if (currentPosition < key.Length)
+        {
+            result.Append(key.AsSpan(currentPosition));
+        }
+        return result.ToString().ToLowerInvariant();
+    }
+
+    private static string GenerateOtpAuthUri(string issuer, string email, string unformattedKey)
+    {
+        // otpauth://totp/Issuer:email?secret=ABC&issuer=Issuer&digits=6
+        return $"otpauth://totp/{Uri.EscapeDataString(issuer)}:{Uri.EscapeDataString(email)}?secret={unformattedKey}&issuer={Uri.EscapeDataString(issuer)}&digits=6";
     }
 
     [Authorize]

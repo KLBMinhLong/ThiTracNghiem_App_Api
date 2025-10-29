@@ -6,6 +6,7 @@ import '../core/token_storage.dart';
 import '../models/auth_response.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../models/two_fa.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiClient _apiClient;
@@ -77,10 +78,20 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     _error = null;
     try {
-      final response = await _authService.login(
+      // Check if 2FA is required by inspecting raw response
+      final raw = await _authService.loginRaw(
         identifier: identifier,
         password: password,
       );
+      final requires2Fa = raw['requiresTwoFactor'] == true;
+      if (requires2Fa) {
+        // Store a temporary marker in memory so UI can navigate to 2FA screen
+        _pending2FaUserId = raw['userId'] as String?;
+        _setLoading(false);
+        notifyListeners();
+        return false; // caller will handle navigation to 2FA
+      }
+      final response = AuthResponse.fromJson(raw);
       await _persistSession(response);
       _currentUser = response.user;
       _setLoading(false);
@@ -93,6 +104,39 @@ class AuthProvider extends ChangeNotifier {
     } catch (error) {
       _error = error.toString();
       await _clearSession();
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  String? _pending2FaUserId;
+  String? get pendingTwoFaUserId => _pending2FaUserId;
+
+  Future<bool> completeLoginWith2Fa({required String code}) async {
+    final userId = _pending2FaUserId;
+    if (userId == null) {
+      _error = 'Không xác định được tài khoản cần xác thực 2 bước';
+      notifyListeners();
+      return false;
+    }
+    _setLoading(true);
+    _error = null;
+    try {
+      final response = await _authService.loginWith2Fa(
+        userId: userId,
+        code: code,
+      );
+      await _persistSession(response);
+      _currentUser = response.user;
+      _pending2FaUserId = null;
+      _setLoading(false);
+      return true;
+    } on ApiException catch (error) {
+      _error = error.message;
+      _setLoading(false);
+      return false;
+    } catch (error) {
+      _error = error.toString();
       _setLoading(false);
       return false;
     }
@@ -216,6 +260,63 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     await _clearSession();
     notifyListeners();
+  }
+
+  // 2FA settings helpers
+  Future<bool> getTwoFaStatus() async {
+    try {
+      return await _authService.getTwoFaStatus();
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<TwoFaSetupResponse> setupTwoFa() async {
+    try {
+      return await _authService.setupTwoFa();
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      rethrow;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> enableTwoFa({required String code}) async {
+    try {
+      await _authService.enableTwoFa(code: code);
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      rethrow;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> disableTwoFa() async {
+    try {
+      await _authService.disableTwoFa();
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      rethrow;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
   }
 
   Future<String?> sendPasswordResetEmail(String email) async {

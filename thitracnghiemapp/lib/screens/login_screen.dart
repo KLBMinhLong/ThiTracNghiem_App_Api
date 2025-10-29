@@ -209,9 +209,17 @@ class _LoginScreenState extends State<LoginScreen> {
       identifier: _identifierController.text.trim(),
       password: _passwordController.text,
     );
-    if (success && mounted) {
+    if (!mounted) return;
+    if (success) {
       Navigator.of(context).pushReplacementNamed('/home');
-    } else if (!success && mounted && auth.error != null) {
+      return;
+    }
+    // If not success, check if 2FA is required
+    if (auth.pendingTwoFaUserId != null) {
+      Navigator.of(context).pushReplacementNamed('/login-2fa');
+      return;
+    }
+    if (auth.error != null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(auth.error!)));

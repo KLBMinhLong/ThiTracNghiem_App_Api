@@ -18,6 +18,7 @@ import 'providers/thi_provider.dart';
 import 'providers/users_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/two_fa_login_screen.dart';
 import 'screens/quiz_screen.dart';
 import 'services/binh_luan_service.dart';
 import 'services/cau_hoi_service.dart';
@@ -97,6 +98,9 @@ class MyApp extends StatelessWidget {
         onGenerateRoute: (settings) {
           if (settings.name == '/home') {
             return MaterialPageRoute(builder: (_) => const HomeScreen());
+          }
+          if (settings.name == '/login-2fa') {
+            return MaterialPageRoute(builder: (_) => const TwoFaLoginScreen());
           }
           if (settings.name == '/quiz') {
             final args = settings.arguments;

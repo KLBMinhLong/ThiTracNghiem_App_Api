@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart' as qr;
 
 import '../models/de_thi.dart';
 import '../models/ket_qua_thi.dart';
@@ -990,6 +991,8 @@ class _ProfileTab extends StatelessWidget {
                 title: const Text('Đổi mật khẩu'),
                 onTap: () => onChangePassword(context),
               ),
+              const Divider(height: 1),
+              _TwoFaTile(),
             ],
           ),
         ),
@@ -1041,3 +1044,180 @@ class _ProfileTab extends StatelessWidget {
 }
 
 // _ResultDetailSheet: màn cũ đã được thay bằng ResultReviewScreen
+
+class _TwoFaTile extends StatefulWidget {
+  @override
+  State<_TwoFaTile> createState() => _TwoFaTileState();
+}
+
+class _TwoFaTileState extends State<_TwoFaTile> {
+  bool? _enabled;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final service = context.read<AuthProvider>();
+      final status = await service.getTwoFaStatus();
+      if (mounted) setState(() => _enabled = status);
+    } catch (_) {
+      if (mounted) setState(() => _enabled = false);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = _enabled == true
+        ? 'Đang bật - yêu cầu mã khi đăng nhập'
+        : 'Đang tắt - đăng nhập bình thường';
+    return ListTile(
+      leading: const Icon(Icons.verified_user_outlined),
+      title: const Text('Xác thực 2 bước (2FA)'),
+      subtitle: Text(subtitle),
+      trailing: _loading
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Switch(
+              value: _enabled ?? false,
+              onChanged: (value) => _onToggle(context, value),
+            ),
+      onTap: () => _onToggle(context, !(_enabled ?? false)),
+    );
+  }
+
+  Future<void> _onToggle(BuildContext context, bool value) async {
+    final authProvider = context.read<AuthProvider>();
+    if (value) {
+      // Enable: fetch setup info and prompt user to verify code
+      setState(() => _loading = true);
+      try {
+        final setup = await authProvider.setupTwoFa();
+        if (!mounted) return;
+        await _showEnableDialog(
+          context,
+          setup.sharedKey,
+          setup.authenticatorUri,
+        );
+        await _load();
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Không thể bật 2FA: $e')));
+      } finally {
+        if (mounted) setState(() => _loading = false);
+      }
+    } else {
+      // Disable directly
+      setState(() => _loading = true);
+      try {
+        await authProvider.disableTwoFa();
+        await _load();
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Không thể tắt 2FA: $e')));
+      } finally {
+        if (mounted) setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _showEnableDialog(
+    BuildContext context,
+    String sharedKey,
+    String authenticatorUri,
+  ) async {
+    final codeController = TextEditingController();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Bật xác thực 2 bước'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('1) Mở Google Authenticator và quét mã:'),
+                const SizedBox(height: 8),
+                Center(
+                  child: SizedBox(
+                    width: 200,
+                    height: 200,
+                    child: qr.QrImageView(
+                      data: authenticatorUri,
+                      version: qr.QrVersions.auto,
+                      gapless: true,
+                      backgroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SelectableText(
+                  authenticatorUri,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+                const Text('2) Hoặc nhập khóa thủ công:'),
+                SelectableText(sharedKey),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: codeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nhập mã 6 số để xác nhận',
+                  ),
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Hủy'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final code = codeController.text.trim();
+                if (code.length != 6) return;
+                try {
+                  await dialogContext.read<AuthProvider>().enableTwoFa(
+                    code: code,
+                  );
+                  if (!mounted) return;
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Đã bật xác thực 2 bước')),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Mã không hợp lệ: $e')),
+                  );
+                }
+              },
+              child: const Text('Xác nhận'),
+            ),
+          ],
+        );
+      },
+    );
+    // Do not dispose codeController here to avoid a race during dialog teardown
+    // and rebuilds triggered by provider updates. It's short-lived and will be
+    // GC'd after dialog is closed.
+  }
+}

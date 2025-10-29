@@ -2,6 +2,7 @@ import '../core/api_client.dart';
 import '../core/api_exception.dart';
 import '../models/auth_response.dart';
 import '../models/user.dart';
+import '../models/two_fa.dart';
 
 class AuthService {
   final ApiClient _client;
@@ -19,6 +20,39 @@ class AuthService {
     if (response is! Map<String, dynamic>) {
       throw const ApiException(
         message: 'Định dạng phản hồi đăng nhập không hợp lệ',
+      );
+    }
+    return AuthResponse.fromJson(response);
+  }
+
+  // Raw login to detect requiresTwoFactor without parsing as AuthResponse
+  Future<Map<String, dynamic>> loginRaw({
+    required String identifier,
+    required String password,
+  }) async {
+    final response = await _client.post(
+      '/api/Auth/login',
+      body: {'userName': identifier, 'password': password},
+    );
+    if (response is! Map<String, dynamic>) {
+      throw const ApiException(
+        message: 'Định dạng phản hồi đăng nhập không hợp lệ',
+      );
+    }
+    return response;
+  }
+
+  Future<AuthResponse> loginWith2Fa({
+    required String userId,
+    required String code,
+  }) async {
+    final response = await _client.post(
+      '/api/Auth/login-2fa',
+      body: {'userId': userId, 'code': code},
+    );
+    if (response is! Map<String, dynamic>) {
+      throw const ApiException(
+        message: 'Định dạng phản hồi đăng nhập 2FA không hợp lệ',
       );
     }
     return AuthResponse.fromJson(response);
@@ -122,5 +156,30 @@ class AuthService {
       '/api/Auth/reset-password',
       body: {'email': email, 'token': token, 'newPassword': newPassword},
     );
+  }
+
+  // 2FA endpoints for settings
+  Future<bool> getTwoFaStatus() async {
+    final response = await _client.get('/api/Auth/2fa/status');
+    if (response is Map<String, dynamic>) {
+      return (response['enabled'] as bool?) ?? false;
+    }
+    return false;
+  }
+
+  Future<TwoFaSetupResponse> setupTwoFa() async {
+    final response = await _client.get('/api/Auth/2fa/setup');
+    if (response is! Map<String, dynamic>) {
+      throw const ApiException(message: 'Không thể khởi tạo thiết lập 2FA');
+    }
+    return TwoFaSetupResponse.fromJson(response);
+  }
+
+  Future<void> enableTwoFa({required String code}) async {
+    await _client.post('/api/Auth/2fa/enable', body: {'code': code});
+  }
+
+  Future<void> disableTwoFa() async {
+    await _client.post('/api/Auth/2fa/disable');
   }
 }

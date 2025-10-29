@@ -12,6 +12,7 @@ import '../providers/lien_he_provider.dart';
 import 'admin/admin_dashboard_screen.dart';
 import 'exam_detail_screen.dart';
 import 'login_screen.dart';
+import 'result_review_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -102,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 _HistoryTab(
-                  onViewDetail: _showResultDetail,
+                  onViewDetail: _openResultReview,
                   restrictToUserId: auth.currentUser?.id,
                 ),
                 _ContactTab(onCreate: _showCreateContact),
@@ -184,17 +185,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return null;
   }
 
-  Future<void> _showResultDetail(KetQuaThiSummary summary) async {
+  Future<void> _openResultReview(KetQuaThiSummary summary) async {
     final provider = context.read<KetQuaThiProvider>();
     await provider.fetchKetQuaThi(summary.id);
     final detail = provider.selectedKetQuaThi;
-    if (!mounted || detail == null) {
-      return;
-    }
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => _ResultDetailSheet(detail: detail),
+    if (!mounted || detail == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ResultReviewScreen(detail: detail)),
     );
     provider.clearSelected();
   }
@@ -711,26 +708,27 @@ class _HistoryTab extends StatelessWidget {
     return Consumer<KetQuaThiProvider>(
       builder: (context, provider, _) {
         return RefreshIndicator(
-          onRefresh: () =>
-              provider.fetchKetQuaThiList(onlyUserId: restrictToUserId),
+          onRefresh: () => provider.fetchKetQuaThiList(
+            page: provider.ketQuaThiList?.page ?? 1,
+            onlyUserId: restrictToUserId,
+          ),
           child: provider.isLoading
               ? ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  children: const [
-                    SizedBox(height: 200),
-                    Center(child: CircularProgressIndicator()),
-                  ],
+                  padding: const EdgeInsets.symmetric(vertical: 48),
+                  children: const [Center(child: CircularProgressIndicator())],
                 )
-              : (() {
+              : () {
                   final rawItems = provider.ketQuaThiList?.items;
                   List<KetQuaThiSummary>? items = rawItems;
                   if (restrictToUserId != null && rawItems != null) {
                     items = rawItems
-                        .where((summary) {
-                          final ownerId =
-                              summary.taiKhoan?.id ?? summary.taiKhoanId;
-                          return ownerId == null || ownerId == restrictToUserId;
-                        })
+                        .where(
+                          (e) =>
+                              (e.taiKhoan?.id ?? e.taiKhoanId) == null ||
+                              (e.taiKhoan?.id ?? e.taiKhoanId) ==
+                                  restrictToUserId,
+                        )
                         .toList(growable: false);
                   }
                   final list = items;
@@ -745,7 +743,7 @@ class _HistoryTab extends StatelessWidget {
                         Center(child: Icon(Icons.history_toggle_off, size: 48)),
                         SizedBox(height: 12),
                         Text(
-                          'Bạn chưa có lịch sử làm bài.',
+                          'Chưa có lịch sử thi',
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -789,12 +787,14 @@ class _HistoryTab extends StatelessWidget {
                       );
                     },
                   );
-                })(),
+                }(),
         );
       },
     );
   }
 }
+
+// Màn cũ _ResultDetailSheet đã thay bằng ResultReviewScreen
 
 class _ContactFormResult {
   final String title;
@@ -1040,69 +1040,4 @@ class _ProfileTab extends StatelessWidget {
   }
 }
 
-class _ResultDetailSheet extends StatelessWidget {
-  final KetQuaThiDetail detail;
-
-  const _ResultDetailSheet({required this.detail});
-
-  @override
-  Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.8,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (context, controller) => Column(
-        children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            detail.deThi?.tenDeThi ?? 'Kết quả thi',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          Text('Điểm: ${detail.diem?.toStringAsFixed(2) ?? 'Chưa chấm'}'),
-          const SizedBox(height: 16),
-          Expanded(
-            child: ListView.separated(
-              controller: controller,
-              padding: const EdgeInsets.all(16),
-              itemCount: detail.chiTiet.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final item = detail.chiTiet[index];
-                final isCorrect = item.dungHaySai ?? false;
-                return Card(
-                  child: ListTile(
-                    title: Text('Câu ${index + 1}: ${item.noiDung}'),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Đáp án đã chọn: ${item.dapAnChon ?? 'Chưa chọn'}',
-                        ),
-                        Text('Đáp án đúng: ${item.dapAnDung}'),
-                      ],
-                    ),
-                    trailing: Icon(
-                      isCorrect ? Icons.check_circle : Icons.cancel,
-                      color: isCorrect ? Colors.green : Colors.red,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+// _ResultDetailSheet: màn cũ đã được thay bằng ResultReviewScreen

@@ -13,6 +13,7 @@ import 'providers/chu_de_provider.dart';
 import 'providers/de_thi_provider.dart';
 import 'providers/ket_qua_thi_provider.dart';
 import 'providers/lien_he_provider.dart';
+import 'providers/chat_provider.dart';
 import 'providers/thi_provider.dart';
 import 'providers/users_provider.dart';
 import 'screens/home_screen.dart';
@@ -24,6 +25,7 @@ import 'services/chu_de_service.dart';
 import 'services/de_thi_service.dart';
 import 'services/ket_qua_thi_service.dart';
 import 'services/lien_he_service.dart';
+import 'services/chat_service.dart';
 import 'services/thi_service.dart';
 import 'services/users_service.dart';
 
@@ -80,6 +82,9 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => UsersProvider(UsersService(apiClient)),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ChatProvider(ChatService(apiClient)),
         ),
       ],
       child: MaterialApp(

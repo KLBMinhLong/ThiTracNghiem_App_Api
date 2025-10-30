@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
 import 'core/api_client.dart';
@@ -29,6 +30,7 @@ import 'services/lien_he_service.dart';
 import 'services/chat_service.dart';
 import 'services/thi_service.dart';
 import 'services/users_service.dart';
+import 'themes/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -88,51 +90,62 @@ class MyApp extends StatelessWidget {
           create: (_) => ChatProvider(ChatService(apiClient)),
         ),
       ],
-      child: MaterialApp(
-        title: 'Thi Trắc Nghiệm App',
-        debugShowCheckedModeBanner: false,
+      child: ScreenUtilInit(
+        // Thiết kế theo kích thước điện thoại phổ biến (iPhone 14 Pro)
+        designSize: const Size(390, 844),
+        minTextAdapt: true,
+        splitScreenMode: true,
         builder: (context, child) {
-          // Dismiss keyboard when tapping outside and ensure consistent scroll behavior
-          return GestureDetector(
-            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-            behavior: HitTestBehavior.translucent,
-            child: child ?? const SizedBox.shrink(),
+          return MaterialApp(
+            title: 'Smart Test',
+            debugShowCheckedModeBanner: false,
+            builder: (context, child) {
+              // Dismiss keyboard when tapping outside
+              return GestureDetector(
+                onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                behavior: HitTestBehavior.translucent,
+                child: child ?? const SizedBox.shrink(),
+              );
+            },
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: ThemeMode
+                .light, // Có thể thay đổi thành ThemeMode.system để tự động
+            onGenerateRoute: (settings) {
+              if (settings.name == '/home') {
+                return MaterialPageRoute(builder: (_) => const HomeScreen());
+              }
+              if (settings.name == '/login-2fa') {
+                return MaterialPageRoute(
+                  builder: (_) => const TwoFaLoginScreen(),
+                );
+              }
+              if (settings.name == '/quiz') {
+                final args = settings.arguments;
+                if (args is DeThi) {
+                  return MaterialPageRoute(
+                    builder: (_) => QuizScreen(deThi: args),
+                  );
+                }
+                // If arguments are missing or wrong type, fall back to home
+                return MaterialPageRoute(builder: (_) => const HomeScreen());
+              }
+              return null;
+            },
+            home: Consumer<AuthProvider>(
+              builder: (context, auth, _) {
+                if (!auth.isInitialized) {
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                return auth.isAuthenticated
+                    ? const HomeScreen()
+                    : const LoginScreen();
+              },
+            ),
           );
         },
-        theme: ThemeData(
-          useMaterial3: true, // Giao diện Material 3 đẹp
-          primarySwatch: Colors.blue,
-          scaffoldBackgroundColor: Colors.grey[50],
-        ),
-        onGenerateRoute: (settings) {
-          if (settings.name == '/home') {
-            return MaterialPageRoute(builder: (_) => const HomeScreen());
-          }
-          if (settings.name == '/login-2fa') {
-            return MaterialPageRoute(builder: (_) => const TwoFaLoginScreen());
-          }
-          if (settings.name == '/quiz') {
-            final args = settings.arguments;
-            if (args is DeThi) {
-              return MaterialPageRoute(builder: (_) => QuizScreen(deThi: args));
-            }
-            // If arguments are missing or wrong type, fall back to home
-            return MaterialPageRoute(builder: (_) => const HomeScreen());
-          }
-          return null;
-        },
-        home: Consumer<AuthProvider>(
-          builder: (context, auth, _) {
-            if (!auth.isInitialized) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              );
-            }
-            return auth.isAuthenticated
-                ? const HomeScreen()
-                : const LoginScreen();
-          },
-        ),
       ),
     );
   }

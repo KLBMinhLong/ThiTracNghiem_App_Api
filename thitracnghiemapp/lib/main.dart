@@ -17,6 +17,7 @@ import 'providers/lien_he_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/thi_provider.dart';
 import 'providers/users_provider.dart';
+import 'providers/theme_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
@@ -31,7 +32,6 @@ import 'services/lien_he_service.dart';
 import 'services/chat_service.dart';
 import 'services/thi_service.dart';
 import 'services/users_service.dart';
-import 'themes/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,6 +53,7 @@ class MyApp extends StatelessWidget {
       providers: [
         Provider<ApiClient>.value(value: apiClient),
         Provider<TokenStorage>.value(value: tokenStorage),
+        ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider()),
         ChangeNotifierProvider<AuthProvider>(
           create: (_) {
             final provider = AuthProvider(
@@ -97,52 +98,59 @@ class MyApp extends StatelessWidget {
         minTextAdapt: true,
         splitScreenMode: true,
         builder: (context, child) {
-          return MaterialApp(
-            title: 'Smart Test',
-            debugShowCheckedModeBanner: false,
-            builder: (context, child) {
-              // Dismiss keyboard when tapping outside
-              return GestureDetector(
-                onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-                behavior: HitTestBehavior.translucent,
-                child: child ?? const SizedBox.shrink(),
+          return Consumer<ThemeProvider>(
+            builder: (context, themeProvider, _) {
+              return MaterialApp(
+                title: 'Smart Test',
+                debugShowCheckedModeBanner: false,
+                builder: (context, child) {
+                  // Dismiss keyboard when tapping outside
+                  return GestureDetector(
+                    onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                    behavior: HitTestBehavior.translucent,
+                    child: child ?? const SizedBox.shrink(),
+                  );
+                },
+                theme: ThemeProvider.lightTheme,
+                darkTheme: ThemeProvider.darkTheme,
+                themeMode: themeProvider.themeMode,
+                onGenerateRoute: (settings) {
+                  if (settings.name == '/home') {
+                    return MaterialPageRoute(
+                      builder: (_) => const HomeScreen(),
+                    );
+                  }
+                  if (settings.name == '/login-2fa') {
+                    return MaterialPageRoute(
+                      builder: (_) => const TwoFaLoginScreen(),
+                    );
+                  }
+                  if (settings.name == '/quiz') {
+                    final args = settings.arguments;
+                    if (args is DeThi) {
+                      return MaterialPageRoute(
+                        builder: (_) => QuizScreen(deThi: args),
+                      );
+                    }
+                    // If arguments are missing or wrong type, fall back to home
+                    return MaterialPageRoute(
+                      builder: (_) => const HomeScreen(),
+                    );
+                  }
+                  return null;
+                },
+                home: Consumer<AuthProvider>(
+                  builder: (context, auth, _) {
+                    if (!auth.isInitialized) {
+                      return const SplashScreen();
+                    }
+                    return auth.isAuthenticated
+                        ? const HomeScreen()
+                        : const LoginScreen();
+                  },
+                ),
               );
             },
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: ThemeMode
-                .light, // Có thể thay đổi thành ThemeMode.system để tự động
-            onGenerateRoute: (settings) {
-              if (settings.name == '/home') {
-                return MaterialPageRoute(builder: (_) => const HomeScreen());
-              }
-              if (settings.name == '/login-2fa') {
-                return MaterialPageRoute(
-                  builder: (_) => const TwoFaLoginScreen(),
-                );
-              }
-              if (settings.name == '/quiz') {
-                final args = settings.arguments;
-                if (args is DeThi) {
-                  return MaterialPageRoute(
-                    builder: (_) => QuizScreen(deThi: args),
-                  );
-                }
-                // If arguments are missing or wrong type, fall back to home
-                return MaterialPageRoute(builder: (_) => const HomeScreen());
-              }
-              return null;
-            },
-            home: Consumer<AuthProvider>(
-              builder: (context, auth, _) {
-                if (!auth.isInitialized) {
-                  return const SplashScreen();
-                }
-                return auth.isAuthenticated
-                    ? const HomeScreen()
-                    : const LoginScreen();
-              },
-            ),
           );
         },
       ),

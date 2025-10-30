@@ -11,6 +11,7 @@ import '../providers/chu_de_provider.dart';
 import '../providers/de_thi_provider.dart';
 import '../providers/ket_qua_thi_provider.dart';
 import '../providers/lien_he_provider.dart';
+import '../providers/theme_provider.dart';
 import '../utils/ui_helpers.dart';
 import 'admin/admin_dashboard_screen.dart';
 import 'exam_detail_screen.dart';
@@ -1771,11 +1772,9 @@ class _ProfileTab extends StatelessWidget {
                 ),
                 title: Text('Chế độ tối', style: TextStyle(fontSize: 14.sp)),
                 value: theme.brightness == Brightness.dark,
-                onChanged: (_) {
-                  UIHelpers.showInfoSnackBar(
-                    context,
-                    'Tính năng sẽ sớm được hỗ trợ',
-                  );
+                onChanged: (_) async {
+                  final themeProvider = context.read<ThemeProvider>();
+                  await themeProvider.toggleTheme();
                 },
               ),
               Divider(height: 1.h, indent: 56.w),

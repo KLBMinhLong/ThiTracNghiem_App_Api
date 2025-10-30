@@ -98,16 +98,78 @@ public class LienHeController : ControllerBase
         _context.LienHes.Add(lienHe);
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetLienHes), new { id = lienHe.Id }, new { lienHe.Id, lienHe.TieuDe, lienHe.NgayGui });
+        return CreatedAtAction(
+            nameof(GetLienHes),
+            new { id = lienHe.Id },
+            new { lienHe.Id, lienHe.TieuDe, lienHe.NoiDung, lienHe.NgayGui, lienHe.TaiKhoanId }
+        );
     }
 
-    // Xóa liên hệ (Admin)
+    // Cập nhật liên hệ (User chỉ có thể sửa liên hệ của mình; Admin có thể sửa bất kỳ)
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateLienHe(int id, [FromBody] UpdateLienHeRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        var currentUser = await User.ResolveUserAsync(_context);
+        if (currentUser == null)
+        {
+            return Unauthorized();
+        }
+
+        var lienHe = await _context.LienHes.FirstOrDefaultAsync(l => l.Id == id);
+        if (lienHe == null)
+        {
+            return NotFound();
+        }
+
+        var isOwner = lienHe.TaiKhoanId == currentUser.Id;
+        var isAdmin = User.IsInRole("Admin");
+        if (!isOwner && !isAdmin)
+        {
+            return Forbid();
+        }
+
+        lienHe.TieuDe = request.TieuDe.Trim();
+        lienHe.NoiDung = request.NoiDung.Trim();
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            lienHe.Id,
+            lienHe.TieuDe,
+            lienHe.NoiDung,
+            lienHe.NgayGui,
+            lienHe.TaiKhoanId
+        });
+    }
+
+    // Xóa liên hệ (Admin hoặc chủ sở hữu)
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteLienHe(int id)
     {
-        var lienHe = await _context.LienHes.FindAsync(id);
-        if (lienHe == null) return NotFound();
+        var currentUser = await User.ResolveUserAsync(_context);
+        if (currentUser == null)
+        {
+            return Unauthorized();
+        }
+
+        var lienHe = await _context.LienHes.FirstOrDefaultAsync(l => l.Id == id);
+        if (lienHe == null)
+        {
+            return NotFound();
+        }
+
+        var isOwner = lienHe.TaiKhoanId == currentUser.Id;
+        var isAdmin = User.IsInRole("Admin");
+        if (!isOwner && !isAdmin)
+        {
+            return Forbid();
+        }
+
         _context.LienHes.Remove(lienHe);
         await _context.SaveChangesAsync();
         return NoContent();

@@ -122,6 +122,43 @@ class LienHeProvider extends ChangeNotifier {
     return success;
   }
 
+  Future<bool> updateLienHe({
+    required int id,
+    required String tieuDe,
+    required String noiDung,
+  }) async {
+    _error = null;
+    _isLoading = true;
+    notifyListeners();
+
+    var success = false;
+    try {
+      final updated = await _service.updateLienHe(
+        id: id,
+        tieuDe: tieuDe,
+        noiDung: noiDung,
+      );
+      if (_myLienHe != null) {
+        _myLienHe = _myLienHe!.map((e) => e.id == id ? updated : e).toList();
+      }
+      if (_allLienHe != null) {
+        final newItems = _allLienHe!.items
+            .map((e) => e.id == id ? updated : e)
+            .toList(growable: false);
+        _allLienHe = _allLienHe!.copyWith(items: newItems);
+      }
+      success = true;
+    } on ApiException catch (e) {
+      _error = e.message;
+    } catch (e) {
+      _error = 'Có lỗi xảy ra: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+    return success;
+  }
+
   void clear() {
     _allLienHe = null;
     _myLienHe = null;

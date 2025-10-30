@@ -62,4 +62,19 @@ class LienHeService {
   Future<void> deleteLienHe(int id) async {
     await _client.delete('/api/LienHe/$id');
   }
+
+  Future<LienHe> updateLienHe({
+    required int id,
+    required String tieuDe,
+    required String noiDung,
+  }) async {
+    final response = await _client.put(
+      '/api/LienHe/$id',
+      body: {'tieuDe': tieuDe, 'noiDung': noiDung},
+    );
+    if (response is! Map<String, dynamic>) {
+      throw const ApiException(message: 'Không cập nhật được liên hệ');
+    }
+    return LienHe.fromJson(response);
+  }
 }

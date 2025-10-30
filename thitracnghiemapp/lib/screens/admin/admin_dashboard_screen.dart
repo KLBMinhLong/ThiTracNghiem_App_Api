@@ -729,13 +729,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             child: ListTile(
                               title: Text(contact.tieuDe),
                               subtitle: Text(
-                                '${contact.noiDung}\nNgười gửi: ${contact.taiKhoan?.userName ?? contact.taiKhoanId}\nNgày: $date',
+                                'Người gửi: ${contact.taiKhoan?.fullName.isNotEmpty == true ? contact.taiKhoan!.fullName : (contact.taiKhoan?.userName ?? contact.taiKhoanId)}\nNgày: $date',
                               ),
                               isThreeLine: true,
                               trailing: IconButton(
                                 icon: const Icon(Icons.delete_outline),
                                 onPressed: () => _deleteContact(contact.id),
                               ),
+                              onTap: () => _showContactDetailDialog(contact),
                             ),
                           );
                         },
@@ -745,6 +746,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _showContactDetailDialog(LienHe contact) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(contact.tieuDe),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Người gửi: ${contact.taiKhoan?.fullName.isNotEmpty == true ? contact.taiKhoan!.fullName : (contact.taiKhoan?.userName ?? contact.taiKhoanId)}',
+              ),
+              const SizedBox(height: 6),
+              SelectableText('Email: ${contact.taiKhoan?.email ?? 'N/A'}'),
+              const Divider(height: 20),
+              Text(
+                'Nội dung:',
+                style: Theme.of(dialogContext).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 6),
+              Text(contact.noiDung),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
     );
   }
 

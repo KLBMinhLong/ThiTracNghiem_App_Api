@@ -812,6 +812,7 @@ class _ContactTab extends StatelessWidget {
                       title: Text(lienHe.tieuDe),
                       subtitle: Text('${lienHe.noiDung}\nNgày gửi: $date'),
                       isThreeLine: true,
+                      onTap: () => _showEditContact(context, lienHe),
                     ),
                   ),
                 );
@@ -821,6 +822,93 @@ class _ContactTab extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _showEditContact(BuildContext rootContext, LienHe lienHe) async {
+    final provider = rootContext.read<LienHeProvider>();
+    final formKey = GlobalKey<FormState>();
+    final titleController = TextEditingController(text: lienHe.tieuDe);
+    final contentController = TextEditingController(text: lienHe.noiDung);
+
+    final result = await showModalBottomSheet<_ContactFormResult?>(
+      context: rootContext,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final viewInsets = MediaQuery.of(sheetContext).viewInsets;
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: viewInsets.bottom + 24,
+              left: 16,
+              right: 16,
+              top: 24,
+            ),
+            child: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: titleController,
+                      decoration: const InputDecoration(labelText: 'Tiêu đề'),
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                          ? 'Vui lòng nhập tiêu đề'
+                          : null,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: contentController,
+                      decoration: const InputDecoration(labelText: 'Nội dung'),
+                      minLines: 3,
+                      maxLines: 6,
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                          ? 'Vui lòng nhập nội dung'
+                          : null,
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: () {
+                        if (!formKey.currentState!.validate()) return;
+                        FocusScope.of(sheetContext).unfocus();
+                        if (!sheetContext.mounted) return;
+                        Navigator.of(sheetContext).pop(
+                          _ContactFormResult(
+                            title: titleController.text.trim(),
+                            content: contentController.text.trim(),
+                          ),
+                        );
+                      },
+                      child: const Text('Lưu thay đổi'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (result == null) return;
+    await provider.updateLienHe(
+      id: lienHe.id,
+      tieuDe: result.title,
+      noiDung: result.content,
+    );
+    if (provider.error != null && rootContext.mounted) {
+      ScaffoldMessenger.of(
+        rootContext,
+      ).showSnackBar(SnackBar(content: Text(provider.error!)));
+      return;
+    }
+    if (rootContext.mounted) {
+      ScaffoldMessenger.of(
+        rootContext,
+      ).showSnackBar(const SnackBar(content: Text('Đã cập nhật liên hệ')));
+    }
   }
 }
 

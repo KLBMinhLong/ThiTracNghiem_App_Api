@@ -40,4 +40,8 @@ class KetQuaThiService {
     }
     return KetQuaThiDetail.fromJson(response);
   }
+
+  Future<void> deleteKetQuaThi(int id) async {
+    await _client.delete('/api/KetQuaThi/$id');
+  }
 }

@@ -649,27 +649,88 @@ class _HistoryTab extends StatelessWidget {
                       final dateString = MaterialLocalizations.of(
                         context,
                       ).formatFullDate(summary.ngayThi);
-                      return Card(
-                        child: ListTile(
-                          title: Text(
-                            summary.deThi?.tenDeThi ?? 'Đề thi #${summary.id}',
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Ngày thi: $dateString'),
-                              if (summary.diem != null)
-                                Text(
-                                  'Điểm: ${summary.diem!.toStringAsFixed(2)}',
+                      return Dismissible(
+                        key: ValueKey('kq-${summary.id}'),
+                        direction: DismissDirection.endToStart,
+                        confirmDismiss: (_) async {
+                          // Only allow deletion when list is restricted to current user
+                          if (restrictToUserId == null ||
+                              (summary.taiKhoan?.id ?? summary.taiKhoanId) !=
+                                  restrictToUserId) {
+                            return false;
+                          }
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (dialogContext) => AlertDialog(
+                              title: const Text('Xoá lịch sử thi'),
+                              content: const Text(
+                                'Bạn có chắc chắn muốn xoá kết quả này?',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(dialogContext).pop(false),
+                                  child: const Text('Huỷ'),
                                 ),
-                            ],
+                                FilledButton(
+                                  onPressed: () =>
+                                      Navigator.of(dialogContext).pop(true),
+                                  child: const Text('Xoá'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm != true) return false;
+
+                          final messenger = ScaffoldMessenger.of(context);
+                          final ok = await context
+                              .read<KetQuaThiProvider>()
+                              .deleteKetQuaThi(summary.id);
+                          if (ok) {
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Đã xoá lịch sử thi'),
+                              ),
+                            );
+                          } else {
+                            final msg =
+                                context.read<KetQuaThiProvider>().error ??
+                                'Không thể xoá lịch sử thi. Vui lòng thử lại.';
+                            messenger.showSnackBar(
+                              SnackBar(content: Text(msg)),
+                            );
+                          }
+                          return ok;
+                        },
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          color: Theme.of(context).colorScheme.error,
+                          child: const Icon(Icons.delete, color: Colors.white),
+                        ),
+                        child: Card(
+                          child: ListTile(
+                            title: Text(
+                              summary.deThi?.tenDeThi ??
+                                  'Đề thi #${summary.id}',
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Ngày thi: $dateString'),
+                                if (summary.diem != null)
+                                  Text(
+                                    'Điểm: ${summary.diem!.toStringAsFixed(2)}',
+                                  ),
+                              ],
+                            ),
+                            trailing: Chip(
+                              label: Text(summary.trangThai),
+                              backgroundColor: statusColor.withOpacity(0.15),
+                              labelStyle: TextStyle(color: statusColor),
+                            ),
+                            onTap: () => onViewDetail(summary),
                           ),
-                          trailing: Chip(
-                            label: Text(summary.trangThai),
-                            backgroundColor: statusColor.withOpacity(0.15),
-                            labelStyle: TextStyle(color: statusColor),
-                          ),
-                          onTap: () => onViewDetail(summary),
                         ),
                       );
                     },

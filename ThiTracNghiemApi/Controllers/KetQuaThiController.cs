@@ -126,4 +126,30 @@ public class KetQuaThiController : ControllerBase
 
         return Ok(response);
     }
+
+    // Xoá kết quả thi (chủ sở hữu hoặc Admin)
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteKetQuaThi(int id)
+    {
+        var userId = await User.ResolveUserIdAsync(_context);
+        var isAdmin = User.IsInRole("Admin");
+        if (!isAdmin && string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized();
+        }
+
+        var ketQua = await _context.KetQuaThis.FirstOrDefaultAsync(k => k.Id == id);
+        if (ketQua == null)
+        {
+            return NotFound();
+        }
+        if (!isAdmin && ketQua.TaiKhoanId != userId)
+        {
+            return Forbid();
+        }
+
+        _context.KetQuaThis.Remove(ketQua);
+        await _context.SaveChangesAsync();
+        return NoContent();
+    }
 }

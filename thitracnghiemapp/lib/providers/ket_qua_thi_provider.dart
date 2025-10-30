@@ -80,4 +80,36 @@ class KetQuaThiProvider extends ChangeNotifier {
     _selectedKetQuaThi = null;
     notifyListeners();
   }
+
+  Future<bool> deleteKetQuaThi(int id) async {
+    _error = null;
+    _isLoading = true;
+    notifyListeners();
+
+    var success = false;
+    try {
+      await _service.deleteKetQuaThi(id);
+      if (_ketQuaThiList != null) {
+        final filtered = _ketQuaThiList!.items
+            .where((e) => e.id != id)
+            .toList(growable: false);
+        _ketQuaThiList = _ketQuaThiList!.copyWith(
+          items: filtered,
+          total: _ketQuaThiList!.total > 0 ? _ketQuaThiList!.total - 1 : 0,
+        );
+      }
+      if (_selectedKetQuaThi?.id == id) {
+        _selectedKetQuaThi = null;
+      }
+      success = true;
+    } on ApiException catch (e) {
+      _error = e.message;
+    } catch (e) {
+      _error = 'Có lỗi xảy ra: $e';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+    return success;
+  }
 }

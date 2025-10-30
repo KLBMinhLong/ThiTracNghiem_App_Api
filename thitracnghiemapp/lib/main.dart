@@ -19,6 +19,7 @@ import 'providers/thi_provider.dart';
 import 'providers/users_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/splash_screen.dart';
 import 'screens/two_fa_login_screen.dart';
 import 'screens/quiz_screen.dart';
 import 'services/binh_luan_service.dart';
@@ -135,9 +136,7 @@ class MyApp extends StatelessWidget {
             home: Consumer<AuthProvider>(
               builder: (context, auth, _) {
                 if (!auth.isInitialized) {
-                  return const Scaffold(
-                    body: Center(child: CircularProgressIndicator()),
-                  );
+                  return const SplashScreen();
                 }
                 return auth.isAuthenticated
                     ? const HomeScreen()

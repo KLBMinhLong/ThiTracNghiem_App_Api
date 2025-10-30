@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart' as qr;
 
@@ -10,6 +11,7 @@ import '../providers/chu_de_provider.dart';
 import '../providers/de_thi_provider.dart';
 import '../providers/ket_qua_thi_provider.dart';
 import '../providers/lien_he_provider.dart';
+import '../utils/ui_helpers.dart';
 import 'admin/admin_dashboard_screen.dart';
 import 'exam_detail_screen.dart';
 import 'login_screen.dart';
@@ -72,16 +74,24 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final titles = ['Đề thi', 'Lịch sử thi', 'Hộp thư góp ý', 'Hồ sơ cá nhân'];
+    final theme = Theme.of(context);
+    final titles = [
+      'Danh sách đề thi',
+      'Lịch sử làm bài',
+      'Góp ý & Hỗ trợ',
+      'Tài khoản của tôi',
+    ];
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(titles[_currentTab]),
+        centerTitle: false,
         actions: [
           if (auth.isAdmin)
             IconButton(
-              tooltip: 'Trang quản trị',
-              icon: const Icon(Icons.admin_panel_settings_outlined),
+              tooltip: 'Quản trị',
+              icon: Icon(Icons.admin_panel_settings_outlined, size: 22.sp),
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const AdminDashboardScreen()),
               ),
@@ -89,7 +99,19 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: _initializing
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(strokeWidth: 3.w),
+                  UIHelpers.verticalSpaceMedium(),
+                  Text(
+                    'Đang tải dữ liệu...',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            )
           : IndexedStack(
               index: _currentTab,
               children: [
@@ -120,22 +142,27 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentTab,
         onDestinationSelected: (index) => setState(() => _currentTab = index),
-        destinations: const [
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.library_books_outlined),
+            icon: Icon(Icons.quiz_outlined, size: 24.sp),
+            selectedIcon: Icon(Icons.quiz, size: 24.sp),
             label: 'Đề thi',
           ),
           NavigationDestination(
-            icon: Icon(Icons.history_outlined),
+            icon: Icon(Icons.history_outlined, size: 24.sp),
+            selectedIcon: Icon(Icons.history, size: 24.sp),
             label: 'Lịch sử',
           ),
           NavigationDestination(
-            icon: Icon(Icons.mail_outline),
-            label: 'Liên hệ',
+            icon: Icon(Icons.feedback_outlined, size: 24.sp),
+            selectedIcon: Icon(Icons.feedback, size: 24.sp),
+            label: 'Góp ý',
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            label: 'Hồ sơ',
+            icon: Icon(Icons.person_outline, size: 24.sp),
+            selectedIcon: Icon(Icons.person, size: 24.sp),
+            label: 'Tài khoản',
           ),
         ],
       ),
@@ -143,32 +170,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _confirmLogout(BuildContext dialogContext) async {
-    final shouldLogout = await showDialog<bool>(
-      context: dialogContext,
-      builder: (context) => AlertDialog(
-        title: const Text('Đăng xuất'),
-        content: const Text('Bạn có chắc chắn muốn đăng xuất?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Huỷ'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Đăng xuất'),
-          ),
-        ],
-      ),
+    final shouldLogout = await UIHelpers.showConfirmDialog(
+      dialogContext,
+      title: 'Đăng xuất',
+      message: 'Bạn có chắc chắn muốn đăng xuất khỏi ứng dụng?',
+      confirmText: 'Đăng xuất',
+      cancelText: 'Hủy',
+      isDangerous: true,
     );
 
-    if (shouldLogout != true) {
-      return;
-    }
+    if (shouldLogout != true) return;
 
     await dialogContext.read<AuthProvider>().logout();
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     Navigator.of(dialogContext).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -180,8 +194,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_currentTab == 2) {
       return FloatingActionButton.extended(
         onPressed: () => _showCreateContact(context),
-        icon: const Icon(Icons.add_comment),
-        label: const Text('Liên hệ mới'),
+        icon: Icon(Icons.add_comment_outlined, size: 20.sp),
+        label: Text(
+          'Gửi góp ý',
+          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
+        ),
       );
     }
     return null;
@@ -199,6 +216,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _showCreateContact(BuildContext context) async {
+    final theme = Theme.of(context);
     final lienHeProvider = context.read<LienHeProvider>();
     final formKey = GlobalKey<FormState>();
     final titleController = TextEditingController();
@@ -209,45 +227,99 @@ class _HomeScreenState extends State<HomeScreen> {
       final formResult = await showModalBottomSheet<_ContactFormResult?>(
         context: context,
         isScrollControlled: true,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+        ),
         builder: (sheetContext) {
           final viewInsets = MediaQuery.of(sheetContext).viewInsets;
           return SafeArea(
             child: Padding(
               padding: EdgeInsets.only(
-                bottom: viewInsets.bottom + 24,
-                left: 16,
-                right: 16,
-                top: 24,
+                bottom: viewInsets.bottom + 16.h,
+                left: 16.w,
+                right: 16.w,
+                top: 16.h,
               ),
               child: SingleChildScrollView(
                 child: Form(
                   key: formKey,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // Header
+                      Row(
+                        children: [
+                          Container(
+                            width: 48.w,
+                            height: 48.h,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  theme.colorScheme.primary,
+                                  theme.colorScheme.secondary,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                            child: Icon(
+                              Icons.feedback_outlined,
+                              color: Colors.white,
+                              size: 24.sp,
+                            ),
+                          ),
+                          UIHelpers.horizontalSpaceMedium(),
+                          Text(
+                            'Gửi góp ý mới',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 18.sp,
+                            ),
+                          ),
+                        ],
+                      ),
+                      UIHelpers.verticalSpaceMedium(),
+
+                      // Title Field
                       TextFormField(
                         controller: titleController,
-                        decoration: const InputDecoration(labelText: 'Tiêu đề'),
+                        decoration: InputDecoration(
+                          labelText: 'Tiêu đề',
+                          hintText: 'Nhập tiêu đề góp ý',
+                          prefixIcon: Icon(Icons.title, size: 20.sp),
+                        ),
                         validator: (value) =>
                             value == null || value.trim().isEmpty
                             ? 'Vui lòng nhập tiêu đề'
                             : null,
                       ),
-                      const SizedBox(height: 12),
+                      UIHelpers.verticalSpaceMedium(),
+
+                      // Content Field
                       TextFormField(
                         controller: contentController,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Nội dung',
+                          hintText: 'Nhập nội dung góp ý chi tiết',
+                          prefixIcon: Icon(
+                            Icons.description_outlined,
+                            size: 20.sp,
+                          ),
+                          alignLabelWithHint: true,
                         ),
-                        minLines: 3,
-                        maxLines: 6,
+                        minLines: 4,
+                        maxLines: 8,
                         validator: (value) =>
                             value == null || value.trim().isEmpty
                             ? 'Vui lòng nhập nội dung'
                             : null,
                       ),
-                      const SizedBox(height: 24),
-                      FilledButton(
+                      UIHelpers.verticalSpaceLarge(),
+
+                      // Submit Button
+                      FilledButton.icon(
                         onPressed: () {
                           if (!formKey.currentState!.validate()) {
                             return;
@@ -263,7 +335,18 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           );
                         },
-                        child: const Text('Gửi liên hệ'),
+                        icon: Icon(Icons.send, size: 20.sp),
+                        label: const Text('Gửi góp ý'),
+                        style: FilledButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 14.h),
+                        ),
+                      ),
+                      UIHelpers.verticalSpaceSmall(),
+
+                      // Cancel Button
+                      TextButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        child: const Text('Hủy'),
                       ),
                     ],
                   ),
@@ -283,6 +366,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
+      UIHelpers.showLoadingDialog(hostContext);
       await lienHeProvider.createLienHe(
         tieuDe: formResult.title,
         noiDung: formResult.content,
@@ -291,16 +375,15 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) {
         return;
       }
+
+      Navigator.pop(hostContext); // Close loading
+
       final error = lienHeProvider.error;
       if (error != null) {
-        ScaffoldMessenger.of(
-          hostContext,
-        ).showSnackBar(SnackBar(content: Text(error)));
+        UIHelpers.showErrorSnackBar(hostContext, error);
         return;
       }
-      ScaffoldMessenger.of(hostContext).showSnackBar(
-        const SnackBar(content: Text('Đã gửi liên hệ thành công')),
-      );
+      UIHelpers.showSuccessSnackBar(hostContext, 'Đã gửi góp ý thành công');
     } finally {
       titleController.dispose();
       contentController.dispose();
@@ -483,6 +566,8 @@ class _ExamTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Consumer2<DeThiProvider, ChuDeProvider>(
       builder: (context, deThiProvider, chuDeProvider, _) {
         final keyword = searchController.text.trim().toLowerCase();
@@ -512,68 +597,283 @@ class _ExamTab extends StatelessWidget {
         return RefreshIndicator(
           onRefresh: () => deThiProvider.fetchOpenDeThis(),
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(16.w),
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
+              // Search Bar
               TextField(
                 controller: searchController,
                 decoration: InputDecoration(
-                  hintText: 'Tìm kiếm theo tên đề thi hoặc chủ đề',
-                  prefixIcon: const Icon(Icons.search),
+                  hintText: 'Tìm kiếm đề thi...',
+                  hintStyle: TextStyle(fontSize: 14.sp),
+                  prefixIcon: Icon(Icons.search, size: 20.sp),
                   suffixIcon: keyword.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear),
+                          icon: Icon(Icons.clear, size: 20.sp),
                           onPressed: () => searchController.clear(),
                         )
                       : null,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 16.w,
+                    vertical: 12.h,
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+
+              UIHelpers.verticalSpaceMedium(),
+
+              // Topic Filter Row
+              Row(
                 children: [
-                  FilterChip(
-                    label: const Text('Tất cả'),
-                    selected: selected == null,
-                    onSelected: (_) => onTopicSelected(null),
+                  Icon(
+                    Icons.filter_list,
+                    size: 20.sp,
+                    color: theme.colorScheme.primary,
                   ),
-                  for (final chuDe in chuDeProvider.chuDes)
-                    FilterChip(
-                      label: Text(chuDe.tenChuDe),
-                      selected: selected == chuDe.id,
-                      onSelected: (_) => onTopicSelected(chuDe.id),
+                  UIHelpers.horizontalSpaceSmall(),
+                  Text(
+                    'Chủ đề:',
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                      color: theme.textTheme.titleMedium?.color,
                     ),
+                  ),
+                  UIHelpers.horizontalSpaceSmall(),
+                  Expanded(
+                    child: Container(
+                      height: 40.h,
+                      padding: EdgeInsets.symmetric(horizontal: 12.w),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: theme.colorScheme.outline.withValues(
+                            alpha: 0.5,
+                          ),
+                        ),
+                        borderRadius: BorderRadius.circular(8.r),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<int?>(
+                          value: selected,
+                          isExpanded: true,
+                          icon: Icon(Icons.arrow_drop_down, size: 20.sp),
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            color: theme.textTheme.bodyLarge?.color,
+                          ),
+                          items: [
+                            DropdownMenuItem<int?>(
+                              value: null,
+                              child: Text(
+                                'Tất cả chủ đề',
+                                style: TextStyle(fontSize: 14.sp),
+                              ),
+                            ),
+                            for (final chuDe in chuDeProvider.chuDes)
+                              DropdownMenuItem<int?>(
+                                value: chuDe.id,
+                                child: Text(
+                                  chuDe.tenChuDe,
+                                  style: TextStyle(fontSize: 14.sp),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
+                          onChanged: (value) => onTopicSelected(value),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 16),
+
+              UIHelpers.verticalSpaceMedium(),
+
+              // Result Count
+              if (!deThiProvider.loadingOpen) ...[
+                Row(
+                  children: [
+                    Text(
+                      'Tìm thấy ${items.length} đề thi',
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        color: theme.textTheme.bodySmall?.color,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    if (selected != null || keyword.isNotEmpty) ...[
+                      UIHelpers.horizontalSpaceSmall(),
+                      TextButton.icon(
+                        onPressed: () {
+                          searchController.clear();
+                          onTopicSelected(null);
+                        },
+                        icon: Icon(Icons.clear_all, size: 16.sp),
+                        label: Text(
+                          'Xóa bộ lọc',
+                          style: TextStyle(fontSize: 12.sp),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 8.w,
+                            vertical: 4.h,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                UIHelpers.verticalSpaceSmall(),
+              ],
+
+              // Loading State
               if (deThiProvider.loadingOpen)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 48),
-                  child: Center(child: CircularProgressIndicator()),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 48.h),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        CircularProgressIndicator(strokeWidth: 3.w),
+                        UIHelpers.verticalSpaceSmall(),
+                        Text(
+                          'Đang tải đề thi...',
+                          style: TextStyle(fontSize: 13.sp),
+                        ),
+                      ],
+                    ),
+                  ),
                 )
+              // Empty State
               else if (items.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 48),
-                  child: Center(child: Text('Không tìm thấy đề thi phù hợp.')),
+                EmptyStateWidget(
+                  icon: Icons.quiz_outlined,
+                  message: keyword.isNotEmpty || selected != null
+                      ? 'Không tìm thấy đề thi phù hợp'
+                      : 'Chưa có đề thi nào',
                 )
+              // Exam List
               else
                 ...items.map(
                   (deThi) => Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      title: Text(deThi.tenDeThi),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Chủ đề: ${topicNameFor(deThi)}'),
-                          Text(
-                            'Thời gian: ${deThi.thoiGianThi} phút | ${deThi.soCauHoi} câu',
-                          ),
-                        ],
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
+                    margin: EdgeInsets.only(bottom: 12.h),
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                    child: InkWell(
                       onTap: () => onOpenExam(deThi),
+                      borderRadius: BorderRadius.circular(12.r),
+                      child: Padding(
+                        padding: EdgeInsets.all(12.w),
+                        child: Row(
+                          children: [
+                            // Icon
+                            Container(
+                              width: 56.w,
+                              height: 56.h,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    theme.colorScheme.primary,
+                                    theme.colorScheme.secondary,
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(12.r),
+                              ),
+                              child: Icon(
+                                Icons.description_outlined,
+                                color: Colors.white,
+                                size: 28.sp,
+                              ),
+                            ),
+
+                            UIHelpers.horizontalSpaceMedium(),
+
+                            // Content
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    deThi.tenDeThi,
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 15.sp,
+                                        ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  UIHelpers.verticalSpaceSmall(),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.category_outlined,
+                                        size: 14.sp,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                      SizedBox(width: 4.w),
+                                      Expanded(
+                                        child: Text(
+                                          topicNameFor(deThi),
+                                          style: TextStyle(
+                                            fontSize: 13.sp,
+                                            color: theme.colorScheme.primary,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 4.h),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.timer_outlined,
+                                        size: 14.sp,
+                                        color: theme.textTheme.bodySmall?.color,
+                                      ),
+                                      SizedBox(width: 4.w),
+                                      Text(
+                                        '${deThi.thoiGianThi} phút',
+                                        style: TextStyle(
+                                          fontSize: 12.sp,
+                                          color:
+                                              theme.textTheme.bodySmall?.color,
+                                        ),
+                                      ),
+                                      SizedBox(width: 12.w),
+                                      Icon(
+                                        Icons.quiz_outlined,
+                                        size: 14.sp,
+                                        color: theme.textTheme.bodySmall?.color,
+                                      ),
+                                      SizedBox(width: 4.w),
+                                      Text(
+                                        '${deThi.soCauHoi} câu',
+                                        style: TextStyle(
+                                          fontSize: 12.sp,
+                                          color:
+                                              theme.textTheme.bodySmall?.color,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Arrow Icon
+                            Icon(
+                              Icons.chevron_right,
+                              size: 24.sp,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -593,6 +893,8 @@ class _HistoryTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Consumer<KetQuaThiProvider>(
       builder: (context, provider, _) {
         return RefreshIndicator(
@@ -600,11 +902,24 @@ class _HistoryTab extends StatelessWidget {
             page: provider.ketQuaThiList?.page ?? 1,
             onlyUserId: restrictToUserId,
           ),
-          child: provider.isLoading
+          child: provider.isLoading && provider.ketQuaThiList == null
               ? ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(vertical: 48),
-                  children: const [Center(child: CircularProgressIndicator())],
+                  padding: EdgeInsets.symmetric(vertical: 48.h),
+                  children: [
+                    Center(
+                      child: Column(
+                        children: [
+                          CircularProgressIndicator(strokeWidth: 3.w),
+                          UIHelpers.verticalSpaceSmall(),
+                          Text(
+                            'Đang tải lịch sử...',
+                            style: TextStyle(fontSize: 13.sp),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 )
               : () {
                   final rawItems = provider.ketQuaThiList?.items;
@@ -623,33 +938,32 @@ class _HistoryTab extends StatelessWidget {
                   if (list == null || list.isEmpty) {
                     return ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 48,
-                      ),
-                      children: const [
-                        Center(child: Icon(Icons.history_toggle_off, size: 48)),
-                        SizedBox(height: 12),
-                        Text(
-                          'Chưa có lịch sử thi',
-                          textAlign: TextAlign.center,
+                      children: [
+                        EmptyStateWidget(
+                          icon: Icons.history_outlined,
+                          message:
+                              'Chưa có lịch sử làm bài.\nHãy bắt đầu làm bài thi đầu tiên!',
                         ),
                       ],
                     );
                   }
                   return ListView.separated(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(16.w),
                     physics: const AlwaysScrollableScrollPhysics(),
                     itemCount: list.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    separatorBuilder: (_, __) => SizedBox(height: 12.h),
                     itemBuilder: (context, index) {
                       final summary = list[index];
                       final statusColor = summary.isCompleted
-                          ? Colors.green
-                          : Theme.of(context).colorScheme.secondary;
-                      final dateString = MaterialLocalizations.of(
-                        context,
-                      ).formatFullDate(summary.ngayThi);
+                          ? Colors.green.shade600
+                          : theme.colorScheme.secondary;
+                      final dateString = UIHelpers.formatDateVN(
+                        summary.ngayThi,
+                      );
+                      final statusText = summary.isCompleted
+                          ? 'Hoàn thành'
+                          : 'Đang làm';
+
                       return Dismissible(
                         key: ValueKey('kq-${summary.id}'),
                         direction: DismissDirection.endToStart,
@@ -660,77 +974,200 @@ class _HistoryTab extends StatelessWidget {
                                   restrictToUserId) {
                             return false;
                           }
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (dialogContext) => AlertDialog(
-                              title: const Text('Xoá lịch sử thi'),
-                              content: const Text(
-                                'Bạn có chắc chắn muốn xoá kết quả này?',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.of(dialogContext).pop(false),
-                                  child: const Text('Huỷ'),
-                                ),
-                                FilledButton(
-                                  onPressed: () =>
-                                      Navigator.of(dialogContext).pop(true),
-                                  child: const Text('Xoá'),
-                                ),
-                              ],
-                            ),
+
+                          final confirm = await UIHelpers.showConfirmDialog(
+                            context,
+                            title: 'Xóa lịch sử',
+                            message:
+                                'Bạn có chắc muốn xóa kết quả bài thi này?\nHành động này không thể hoàn tác.',
+                            confirmText: 'Xóa',
+                            cancelText: 'Hủy',
+                            isDangerous: true,
                           );
+
                           if (confirm != true) return false;
 
-                          final messenger = ScaffoldMessenger.of(context);
                           final ok = await context
                               .read<KetQuaThiProvider>()
                               .deleteKetQuaThi(summary.id);
                           if (ok) {
-                            messenger.showSnackBar(
-                              const SnackBar(
-                                content: Text('Đã xoá lịch sử thi'),
-                              ),
+                            UIHelpers.showSuccessSnackBar(
+                              context,
+                              'Đã xóa lịch sử thi thành công',
                             );
                           } else {
                             final msg =
                                 context.read<KetQuaThiProvider>().error ??
-                                'Không thể xoá lịch sử thi. Vui lòng thử lại.';
-                            messenger.showSnackBar(
-                              SnackBar(content: Text(msg)),
-                            );
+                                'Không thể xóa lịch sử thi. Vui lòng thử lại.';
+                            UIHelpers.showErrorSnackBar(context, msg);
                           }
                           return ok;
                         },
                         background: Container(
                           alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          color: Theme.of(context).colorScheme.error,
-                          child: const Icon(Icons.delete, color: Colors.white),
+                          padding: EdgeInsets.symmetric(horizontal: 20.w),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.error,
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.delete_outline,
+                                color: Colors.white,
+                                size: 28.sp,
+                              ),
+                              SizedBox(height: 4.h),
+                              Text(
+                                'Xóa',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12.sp,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         child: Card(
-                          child: ListTile(
-                            title: Text(
-                              summary.deThi?.tenDeThi ??
-                                  'Đề thi #${summary.id}',
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Ngày thi: $dateString'),
-                                if (summary.diem != null)
-                                  Text(
-                                    'Điểm: ${summary.diem!.toStringAsFixed(2)}',
-                                  ),
-                              ],
-                            ),
-                            trailing: Chip(
-                              label: Text(summary.trangThai),
-                              backgroundColor: statusColor.withOpacity(0.15),
-                              labelStyle: TextStyle(color: statusColor),
-                            ),
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          child: InkWell(
                             onTap: () => onViewDetail(summary),
+                            borderRadius: BorderRadius.circular(12.r),
+                            child: Padding(
+                              padding: EdgeInsets.all(12.w),
+                              child: Row(
+                                children: [
+                                  // Status Icon
+                                  Container(
+                                    width: 56.w,
+                                    height: 56.h,
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withValues(
+                                        alpha: 0.15,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12.r),
+                                    ),
+                                    child: Icon(
+                                      summary.isCompleted
+                                          ? Icons.check_circle_outline
+                                          : Icons.pending_outlined,
+                                      color: statusColor,
+                                      size: 28.sp,
+                                    ),
+                                  ),
+
+                                  UIHelpers.horizontalSpaceMedium(),
+
+                                  // Content
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          summary.deThi?.tenDeThi ??
+                                              'Đề thi #${summary.id}',
+                                          style: theme.textTheme.titleMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 15.sp,
+                                              ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        UIHelpers.verticalSpaceSmall(),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.calendar_today_outlined,
+                                              size: 14.sp,
+                                              color: theme
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.color,
+                                            ),
+                                            SizedBox(width: 4.w),
+                                            Expanded(
+                                              child: Text(
+                                                dateString,
+                                                style: TextStyle(
+                                                  fontSize: 12.sp,
+                                                  color: theme
+                                                      .textTheme
+                                                      .bodySmall
+                                                      ?.color,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (summary.diem != null) ...[
+                                          SizedBox(height: 4.h),
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.stars_outlined,
+                                                size: 14.sp,
+                                                color: Colors.amber.shade700,
+                                              ),
+                                              SizedBox(width: 4.w),
+                                              Text(
+                                                'Điểm: ${summary.diem!.toStringAsFixed(1)}',
+                                                style: TextStyle(
+                                                  fontSize: 13.sp,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.amber.shade700,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+
+                                  // Status Badge
+                                  Column(
+                                    children: [
+                                      Container(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 10.w,
+                                          vertical: 6.h,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withValues(
+                                            alpha: 0.15,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            20.r,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          statusText,
+                                          style: TextStyle(
+                                            color: statusColor,
+                                            fontSize: 11.sp,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(height: 4.h),
+                                      Icon(
+                                        Icons.chevron_right,
+                                        size: 20.sp,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       );
@@ -759,6 +1196,8 @@ class _ContactTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Consumer<LienHeProvider>(
       builder: (context, provider, _) {
         return RefreshIndicator(
@@ -767,114 +1206,211 @@ class _ContactTab extends StatelessWidget {
             if (provider.isLoading && provider.myLienHe == null) {
               return ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(vertical: 48),
-                children: const [Center(child: CircularProgressIndicator())],
-              );
-            }
-            if (provider.error != null) {
-              return ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.symmetric(vertical: 48.h),
                 children: [
-                  Card(
-                    color: Theme.of(context).colorScheme.errorContainer,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        provider.error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onErrorContainer,
+                  Center(
+                    child: Column(
+                      children: [
+                        CircularProgressIndicator(strokeWidth: 3.w),
+                        UIHelpers.verticalSpaceSmall(),
+                        Text(
+                          'Đang tải góp ý...',
+                          style: TextStyle(fontSize: 13.sp),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ],
               );
             }
-            final items = provider.myLienHe ?? const <LienHe>[];
-            if (items.isEmpty) {
+
+            if (provider.error != null) {
               return ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 48,
-                ),
-                children: const [
-                  Center(
-                    child: Icon(Icons.mark_email_unread_outlined, size: 48),
-                  ),
-                  SizedBox(height: 12),
-                  Text(
-                    'Chưa có liên hệ nào. Hãy gửi góp ý đầu tiên!',
-                    textAlign: TextAlign.center,
+                children: [
+                  ErrorStateWidget(
+                    message: provider.error!,
+                    onRetry: () => provider.fetchMine(),
                   ),
                 ],
               );
             }
+
+            final items = provider.myLienHe ?? const <LienHe>[];
+            if (items.isEmpty) {
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  EmptyStateWidget(
+                    icon: Icons.feedback_outlined,
+                    message:
+                        'Chưa có góp ý nào.\nHãy gửi góp ý đầu tiên của bạn!',
+                    actionText: 'Gửi góp ý',
+                    onActionPressed: () => onCreate(context),
+                  ),
+                ],
+              );
+            }
+
             return ListView.separated(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(16.w),
               physics: const AlwaysScrollableScrollPhysics(),
               itemCount: items.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (_, __) => SizedBox(height: 12.h),
               itemBuilder: (context, index) {
                 final lienHe = items[index];
-                final date = MaterialLocalizations.of(
-                  context,
-                ).formatFullDate(lienHe.ngayGui);
+                final date = UIHelpers.formatDateVN(lienHe.ngayGui);
+
                 return Dismissible(
                   key: ValueKey(lienHe.id),
                   direction: DismissDirection.endToStart,
                   confirmDismiss: (_) async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (dialogContext) => AlertDialog(
-                        title: const Text('Xoá liên hệ'),
-                        content: const Text(
-                          'Bạn có chắc muốn xoá liên hệ này?',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () =>
-                                Navigator.of(dialogContext).pop(false),
-                            child: const Text('Huỷ'),
-                          ),
-                          FilledButton(
-                            onPressed: () =>
-                                Navigator.of(dialogContext).pop(true),
-                            child: const Text('Xoá'),
-                          ),
-                        ],
-                      ),
+                    final confirm = await UIHelpers.showConfirmDialog(
+                      context,
+                      title: 'Xóa góp ý',
+                      message: 'Bạn có chắc muốn xóa góp ý này?',
+                      confirmText: 'Xóa',
+                      cancelText: 'Hủy',
+                      isDangerous: true,
                     );
-                    if (confirm != true) {
-                      return false;
-                    }
-                    final messenger = ScaffoldMessenger.of(context);
+
+                    if (confirm != true) return false;
+
                     final success = await provider.deleteLienHe(lienHe.id);
                     if (success) {
-                      messenger.showSnackBar(
-                        const SnackBar(content: Text('Đã xoá liên hệ')),
+                      UIHelpers.showSuccessSnackBar(
+                        context,
+                        'Đã xóa góp ý thành công',
                       );
                     } else {
                       final message =
                           provider.error ??
-                          'Không thể xoá liên hệ. Vui lòng thử lại.';
-                      messenger.showSnackBar(SnackBar(content: Text(message)));
+                          'Không thể xóa góp ý. Vui lòng thử lại.';
+                      UIHelpers.showErrorSnackBar(context, message);
                     }
                     return success;
                   },
                   background: Container(
                     alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    color: Theme.of(context).colorScheme.error,
-                    child: const Icon(Icons.delete, color: Colors.white),
+                    padding: EdgeInsets.symmetric(horizontal: 20.w),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.error,
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.delete_outline,
+                          color: Colors.white,
+                          size: 28.sp,
+                        ),
+                        SizedBox(height: 4.h),
+                        Text(
+                          'Xóa',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   child: Card(
-                    child: ListTile(
-                      title: Text(lienHe.tieuDe),
-                      subtitle: Text('${lienHe.noiDung}\nNgày gửi: $date'),
-                      isThreeLine: true,
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                    child: InkWell(
                       onTap: () => _showEditContact(context, lienHe),
+                      borderRadius: BorderRadius.circular(12.r),
+                      child: Padding(
+                        padding: EdgeInsets.all(12.w),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Icon
+                            Container(
+                              width: 48.w,
+                              height: 48.h,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    theme.colorScheme.primary,
+                                    theme.colorScheme.secondary,
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(12.r),
+                              ),
+                              child: Icon(
+                                Icons.message_outlined,
+                                color: Colors.white,
+                                size: 24.sp,
+                              ),
+                            ),
+
+                            UIHelpers.horizontalSpaceMedium(),
+
+                            // Content
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    lienHe.tieuDe,
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 15.sp,
+                                        ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  UIHelpers.verticalSpaceSmall(),
+                                  Text(
+                                    lienHe.noiDung,
+                                    style: TextStyle(
+                                      fontSize: 13.sp,
+                                      color: theme.textTheme.bodyMedium?.color,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  SizedBox(height: 6.h),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.calendar_today_outlined,
+                                        size: 12.sp,
+                                        color: theme.textTheme.bodySmall?.color,
+                                      ),
+                                      SizedBox(width: 4.w),
+                                      Text(
+                                        date,
+                                        style: TextStyle(
+                                          fontSize: 11.sp,
+                                          color:
+                                              theme.textTheme.bodySmall?.color,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Edit Icon
+                            Icon(
+                              Icons.edit_outlined,
+                              size: 20.sp,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 );
@@ -887,6 +1423,7 @@ class _ContactTab extends StatelessWidget {
   }
 
   Future<void> _showEditContact(BuildContext rootContext, LienHe lienHe) async {
+    final theme = Theme.of(rootContext);
     final provider = rootContext.read<LienHeProvider>();
     final formKey = GlobalKey<FormState>();
     final titleController = TextEditingController(text: lienHe.tieuDe);
@@ -895,43 +1432,99 @@ class _ContactTab extends StatelessWidget {
     final result = await showModalBottomSheet<_ContactFormResult?>(
       context: rootContext,
       isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+      ),
       builder: (sheetContext) {
         final viewInsets = MediaQuery.of(sheetContext).viewInsets;
         return SafeArea(
           child: Padding(
             padding: EdgeInsets.only(
-              bottom: viewInsets.bottom + 24,
-              left: 16,
-              right: 16,
-              top: 24,
+              bottom: viewInsets.bottom + 16.h,
+              left: 16.w,
+              right: 16.w,
+              top: 16.h,
             ),
             child: SingleChildScrollView(
               child: Form(
                 key: formKey,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // Header
+                    Row(
+                      children: [
+                        Container(
+                          width: 48.w,
+                          height: 48.h,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                theme.colorScheme.primary,
+                                theme.colorScheme.secondary,
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          child: Icon(
+                            Icons.edit_outlined,
+                            color: Colors.white,
+                            size: 24.sp,
+                          ),
+                        ),
+                        UIHelpers.horizontalSpaceMedium(),
+                        Text(
+                          'Chỉnh sửa góp ý',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 18.sp,
+                          ),
+                        ),
+                      ],
+                    ),
+                    UIHelpers.verticalSpaceMedium(),
+
+                    // Title Field
                     TextFormField(
                       controller: titleController,
-                      decoration: const InputDecoration(labelText: 'Tiêu đề'),
+                      decoration: InputDecoration(
+                        labelText: 'Tiêu đề',
+                        hintText: 'Nhập tiêu đề góp ý',
+                        prefixIcon: Icon(Icons.title, size: 20.sp),
+                      ),
                       validator: (value) =>
                           value == null || value.trim().isEmpty
                           ? 'Vui lòng nhập tiêu đề'
                           : null,
                     ),
-                    const SizedBox(height: 12),
+                    UIHelpers.verticalSpaceMedium(),
+
+                    // Content Field
                     TextFormField(
                       controller: contentController,
-                      decoration: const InputDecoration(labelText: 'Nội dung'),
-                      minLines: 3,
-                      maxLines: 6,
+                      decoration: InputDecoration(
+                        labelText: 'Nội dung',
+                        hintText: 'Nhập nội dung góp ý',
+                        prefixIcon: Icon(
+                          Icons.description_outlined,
+                          size: 20.sp,
+                        ),
+                        alignLabelWithHint: true,
+                      ),
+                      minLines: 4,
+                      maxLines: 8,
                       validator: (value) =>
                           value == null || value.trim().isEmpty
                           ? 'Vui lòng nhập nội dung'
                           : null,
                     ),
-                    const SizedBox(height: 24),
-                    FilledButton(
+                    UIHelpers.verticalSpaceLarge(),
+
+                    // Save Button
+                    FilledButton.icon(
                       onPressed: () {
                         if (!formKey.currentState!.validate()) return;
                         FocusScope.of(sheetContext).unfocus();
@@ -943,7 +1536,18 @@ class _ContactTab extends StatelessWidget {
                           ),
                         );
                       },
-                      child: const Text('Lưu thay đổi'),
+                      icon: Icon(Icons.check, size: 20.sp),
+                      label: const Text('Lưu thay đổi'),
+                      style: FilledButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 14.h),
+                      ),
+                    ),
+                    UIHelpers.verticalSpaceSmall(),
+
+                    // Cancel Button
+                    TextButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: const Text('Hủy'),
                     ),
                   ],
                 ),
@@ -955,21 +1559,23 @@ class _ContactTab extends StatelessWidget {
     );
 
     if (result == null) return;
+
+    UIHelpers.showLoadingDialog(rootContext);
     await provider.updateLienHe(
       id: lienHe.id,
       tieuDe: result.title,
       noiDung: result.content,
     );
+
+    if (rootContext.mounted) Navigator.pop(rootContext); // Close loading
+
     if (provider.error != null && rootContext.mounted) {
-      ScaffoldMessenger.of(
-        rootContext,
-      ).showSnackBar(SnackBar(content: Text(provider.error!)));
+      UIHelpers.showErrorSnackBar(rootContext, provider.error!);
       return;
     }
+
     if (rootContext.mounted) {
-      ScaffoldMessenger.of(
-        rootContext,
-      ).showSnackBar(const SnackBar(content: Text('Đã cập nhật liên hệ')));
+      UIHelpers.showSuccessSnackBar(rootContext, 'Đã cập nhật góp ý');
     }
   }
 }
@@ -987,103 +1593,278 @@ class _ProfileTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final auth = context.watch<AuthProvider>();
     final user = auth.currentUser;
+
     if (user == null) {
       return const Center(child: Text('Không tìm thấy thông tin người dùng'));
     }
+
+    final initial = user.fullName.isNotEmpty
+        ? user.fullName[0].toUpperCase()
+        : user.userName[0].toUpperCase();
+
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16.w),
       children: [
+        // Profile Header Card
         Card(
-          child: ListTile(
-            leading: CircleAvatar(
-              child: Text(
-                user.fullName.isNotEmpty
-                    ? user.fullName[0].toUpperCase()
-                    : user.userName[0].toUpperCase(),
-              ),
+          elevation: 3,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(20.w),
+            child: Column(
+              children: [
+                // Avatar with gradient border
+                Container(
+                  padding: EdgeInsets.all(4.w),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [
+                        theme.colorScheme.primary,
+                        theme.colorScheme.secondary,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: CircleAvatar(
+                    radius: 40.r,
+                    backgroundColor: Colors.white,
+                    child: Text(
+                      initial,
+                      style: TextStyle(
+                        fontSize: 32.sp,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
+                UIHelpers.verticalSpaceMedium(),
+
+                // Name
+                Text(
+                  user.fullName.isNotEmpty ? user.fullName : user.userName,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18.sp,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 4.h),
+
+                // Email
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.email_outlined,
+                      size: 14.sp,
+                      color: theme.textTheme.bodySmall?.color,
+                    ),
+                    SizedBox(width: 4.w),
+                    Flexible(
+                      child: Text(
+                        user.email,
+                        style: TextStyle(
+                          fontSize: 13.sp,
+                          color: theme.textTheme.bodySmall?.color,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            title: Text(
-              user.fullName.isNotEmpty ? user.fullName : user.userName,
-            ),
-            subtitle: Text(user.email),
           ),
         ),
-        const SizedBox(height: 24),
-        Text('Tài khoản', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
+
+        UIHelpers.verticalSpaceLarge(),
+
+        // Account Section
+        UIHelpers.sectionHeader(context, 'Tài khoản'),
+        UIHelpers.verticalSpaceSmall(),
         Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.r),
+          ),
           child: Column(
             children: [
               ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: const Text('Chỉnh sửa thông tin'),
+                leading: Container(
+                  width: 40.w,
+                  height: 40.h,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: Icon(
+                    Icons.edit_outlined,
+                    size: 20.sp,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                title: Text(
+                  'Chỉnh sửa thông tin',
+                  style: TextStyle(fontSize: 14.sp),
+                ),
+                trailing: Icon(Icons.chevron_right, size: 20.sp),
                 onTap: () => onEditProfile(context),
               ),
-              const Divider(height: 1),
+              Divider(height: 1.h, indent: 56.w),
               ListTile(
-                leading: const Icon(Icons.lock_reset_outlined),
-                title: const Text('Đổi mật khẩu'),
+                leading: Container(
+                  width: 40.w,
+                  height: 40.h,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.secondary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: Icon(
+                    Icons.lock_reset_outlined,
+                    size: 20.sp,
+                    color: theme.colorScheme.secondary,
+                  ),
+                ),
+                title: Text('Đổi mật khẩu', style: TextStyle(fontSize: 14.sp)),
+                trailing: Icon(Icons.chevron_right, size: 20.sp),
                 onTap: () => onChangePassword(context),
               ),
-              const Divider(height: 1),
+              Divider(height: 1.h, indent: 56.w),
               _TwoFaTile(),
             ],
           ),
         ),
-        const SizedBox(height: 24),
-        Text('Cài đặt', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
+
+        UIHelpers.verticalSpaceLarge(),
+
+        // Settings Section
+        UIHelpers.sectionHeader(context, 'Cài đặt'),
+        UIHelpers.verticalSpaceSmall(),
         Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.r),
+          ),
           child: Column(
             children: [
               SwitchListTile(
-                secondary: const Icon(Icons.dark_mode_outlined),
-                title: const Text('Chế độ tối'),
-                value: Theme.of(context).brightness == Brightness.dark,
+                secondary: Container(
+                  width: 40.w,
+                  height: 40.h,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: Icon(
+                    Icons.dark_mode_outlined,
+                    size: 20.sp,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                title: Text('Chế độ tối', style: TextStyle(fontSize: 14.sp)),
+                value: theme.brightness == Brightness.dark,
                 onChanged: (_) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Tính năng sẽ sớm được hỗ trợ.'),
-                    ),
+                  UIHelpers.showInfoSnackBar(
+                    context,
+                    'Tính năng sẽ sớm được hỗ trợ',
                   );
                 },
               ),
-              const Divider(height: 1),
+              Divider(height: 1.h, indent: 56.w),
               SwitchListTile(
-                secondary: const Icon(Icons.notifications_outlined),
-                title: const Text('Thông báo hoạt động'),
+                secondary: Container(
+                  width: 40.w,
+                  height: 40.h,
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: Icon(
+                    Icons.notifications_outlined,
+                    size: 20.sp,
+                    color: Colors.orange,
+                  ),
+                ),
+                title: Text(
+                  'Thông báo hoạt động',
+                  style: TextStyle(fontSize: 14.sp),
+                ),
                 value: true,
                 onChanged: (_) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Tính năng thông báo đang được phát triển.',
-                      ),
-                    ),
+                  UIHelpers.showInfoSnackBar(
+                    context,
+                    'Tính năng thông báo đang được phát triển',
                   );
                 },
               ),
-              const Divider(height: 1),
+              Divider(height: 1.h, indent: 56.w),
               ListTile(
-                leading: const Icon(Icons.bar_chart_outlined),
-                title: const Text('Thống kê kết quả'),
+                leading: Container(
+                  width: 40.w,
+                  height: 40.h,
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: Icon(
+                    Icons.bar_chart_outlined,
+                    size: 20.sp,
+                    color: Colors.purple,
+                  ),
+                ),
+                title: Text(
+                  'Thống kê kết quả',
+                  style: TextStyle(fontSize: 14.sp),
+                ),
+                trailing: Icon(Icons.chevron_right, size: 20.sp),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const StatisticsScreen()),
                   );
                 },
               ),
-              const Divider(height: 1),
+              Divider(height: 1.h, indent: 56.w),
               ListTile(
-                leading: const Icon(Icons.logout),
-                title: const Text('Đăng xuất'),
+                leading: Container(
+                  width: 40.w,
+                  height: 40.h,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: Icon(
+                    Icons.logout,
+                    size: 20.sp,
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+                title: Text(
+                  'Đăng xuất',
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+                trailing: Icon(
+                  Icons.chevron_right,
+                  size: 20.sp,
+                  color: theme.colorScheme.error,
+                ),
                 onTap: () => onLogout(context),
               ),
             ],
           ),
         ),
+
+        UIHelpers.verticalSpaceLarge(),
       ],
     );
   }
@@ -1179,7 +1960,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                       child: Text(
                         _birthday == null
                             ? 'Ngày sinh: chưa cập nhật'
-                            : 'Ngày sinh: ${MaterialLocalizations.of(context).formatFullDate(_birthday!)}',
+                            : 'Ngày sinh: ${UIHelpers.formatDateOnlyVN(_birthday!)}',
                       ),
                     ),
                     TextButton(

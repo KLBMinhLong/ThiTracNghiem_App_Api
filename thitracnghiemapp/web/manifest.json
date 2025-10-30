@@ -1,11 +1,11 @@
 {
-    "name": "thitracnghiemapp",
-    "short_name": "thitracnghiemapp",
+    "name": "Smart Test",
+    "short_name": "Smart Test",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#FFFFFF",
-    "theme_color": "#FFFFFF",
-    "description": "A new Flutter project.",
+    "theme_color": "#2196F3",
+    "description": "Hệ thống thi trắc nghiệm thông minh",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

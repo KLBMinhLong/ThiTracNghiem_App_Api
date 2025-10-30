@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
 import '../models/de_thi.dart';
@@ -8,6 +9,7 @@ import '../models/quiz_session.dart';
 import '../providers/auth_provider.dart';
 import '../providers/ket_qua_thi_provider.dart';
 import '../providers/thi_provider.dart';
+import '../utils/ui_helpers.dart';
 import 'result_screen.dart';
 
 class QuizScreen extends StatefulWidget {
@@ -56,15 +58,15 @@ class _QuizScreenState extends State<QuizScreen> {
       final friendlyMessage = provider.error!.length > 200
           ? 'Không thể tải bài thi. Vui lòng thử lại sau.'
           : provider.error!;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(friendlyMessage)));
+      UIHelpers.showErrorSnackBar(context, friendlyMessage);
       Navigator.of(context).pop();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return WillPopScope(
       onWillPop: () async {
         final shouldLeave = await _confirmExit(context);
@@ -74,18 +76,44 @@ class _QuizScreenState extends State<QuizScreen> {
         return shouldLeave;
       },
       child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
         appBar: AppBar(
           title: Text(widget.deThi.tenDeThi),
+          centerTitle: false,
           actions: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Center(
-                child: Text(
-                  _formatTime(_remainingSeconds),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+            // Timer Display
+            Container(
+              margin: EdgeInsets.only(right: 16.w),
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    _remainingSeconds > 60
+                        ? theme.colorScheme.primary
+                        : Colors.red.shade600,
+                    _remainingSeconds > 60
+                        ? theme.colorScheme.secondary
+                        : Colors.red.shade800,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.timer_outlined, color: Colors.white, size: 18.sp),
+                  SizedBox(width: 6.w),
+                  Text(
+                    _formatTime(_remainingSeconds),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15.sp,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -93,7 +121,19 @@ class _QuizScreenState extends State<QuizScreen> {
         body: Consumer<ThiProvider>(
           builder: (context, provider, _) {
             if (provider.isLoading) {
-              return const Center(child: CircularProgressIndicator());
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(strokeWidth: 3.w),
+                    UIHelpers.verticalSpaceMedium(),
+                    Text(
+                      'Đang tải bài thi...',
+                      style: TextStyle(fontSize: 14.sp),
+                    ),
+                  ],
+                ),
+              );
             }
 
             if (provider.error != null) {
@@ -105,7 +145,10 @@ class _QuizScreenState extends State<QuizScreen> {
 
             final session = provider.currentSession;
             if (session == null || session.cauHois.isEmpty) {
-              return const Center(child: Text('Không có câu hỏi để hiển thị'));
+              return EmptyStateWidget(
+                icon: Icons.quiz_outlined,
+                message: 'Không có câu hỏi để hiển thị',
+              );
             }
 
             if (_remainingSeconds == 0) {
@@ -125,9 +168,10 @@ class _QuizScreenState extends State<QuizScreen> {
                 ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(16.w),
                     child: _QuestionBody(
                       question: question,
+                      questionNumber: _currentIndex + 1,
                       onSelect: (answer) =>
                           _selectAnswer(provider, question, answer),
                     ),
@@ -140,6 +184,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   onNext: () => setState(() => _currentIndex++),
                   onSubmit: _submitting ? null : () => _submit(provider),
                   isLast: _currentIndex == session.cauHois.length - 1,
+                  submitting: _submitting,
                 ),
               ],
             );
@@ -157,9 +202,7 @@ class _QuizScreenState extends State<QuizScreen> {
     await provider.updateDapAn(cauHoiId: question.id, dapAnChon: answer);
     final error = provider.error;
     if (mounted && error != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error)));
+      UIHelpers.showErrorSnackBar(context, error);
     }
   }
 
@@ -217,23 +260,16 @@ class _QuizScreenState extends State<QuizScreen> {
     if (provider.currentSession == null) {
       return true;
     }
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Thoát bài thi?'),
-        content: const Text('Tiến trình hiện tại sẽ không được lưu.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Tiếp tục'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Thoát'),
-          ),
-        ],
-      ),
+
+    final result = await UIHelpers.showConfirmDialog(
+      context,
+      title: 'Thoát bài thi?',
+      message: 'Tiến trình hiện tại sẽ không được lưu.',
+      confirmText: 'Thoát',
+      cancelText: 'Tiếp tục',
+      isDangerous: true,
     );
+
     return result ?? false;
   }
 }
@@ -249,21 +285,8 @@ class _ErrorView extends StatelessWidget {
     final displayMessage = message.length > 300
         ? 'Không thể tải bài thi. Vui lòng thử lại sau.'
         : message;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(displayMessage, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              ElevatedButton(onPressed: onRetry, child: const Text('Thử lại')),
-            ],
-          ),
-        ),
-      ),
-    );
+
+    return ErrorStateWidget(message: displayMessage, onRetry: onRetry);
   }
 }
 
@@ -282,37 +305,135 @@ class _ProgressHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 12, left: 16, right: 16, bottom: 4),
+    final theme = Theme.of(context);
+    final answered = questions.where((q) => q.selectedAnswer != null).length;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 8.h),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4.r,
+            offset: Offset(0, 2.h),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Câu hỏi $current/$total',
-            style: Theme.of(context).textTheme.titleMedium,
+          Row(
+            children: [
+              Container(
+                width: 40.w,
+                height: 40.h,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      theme.colorScheme.primary,
+                      theme.colorScheme.secondary,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(10.r),
+                ),
+                child: Center(
+                  child: Text(
+                    '$current',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              UIHelpers.horizontalSpaceMedium(),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Câu hỏi $current/$total',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15.sp,
+                      ),
+                    ),
+                    SizedBox(height: 2.h),
+                    Text(
+                      'Đã trả lời: $answered/$total',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: theme.textTheme.bodySmall?.color,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          UIHelpers.verticalSpaceMedium(),
           SizedBox(
-            height: 48,
+            height: 48.h,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: total,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              separatorBuilder: (_, __) => SizedBox(width: 8.w),
               itemBuilder: (context, index) {
                 final question = questions[index];
-                final answered = question.selectedAnswer != null;
+                final isAnswered = question.selectedAnswer != null;
+                final isCurrent = index == current - 1;
+
                 return GestureDetector(
                   onTap: () => onJumpTo(index),
-                  child: CircleAvatar(
-                    backgroundColor: index == current - 1
-                        ? Theme.of(context).colorScheme.primary
-                        : answered
-                        ? Theme.of(context).colorScheme.primaryContainer
-                        : Theme.of(context).colorScheme.surfaceVariant,
-                    foregroundColor: index == current - 1
-                        ? Theme.of(context).colorScheme.onPrimary
-                        : Theme.of(context).colorScheme.onSurface,
-                    child: Text('${index + 1}'),
+                  child: Container(
+                    width: 44.w,
+                    height: 44.h,
+                    decoration: BoxDecoration(
+                      gradient: isCurrent
+                          ? LinearGradient(
+                              colors: [
+                                theme.colorScheme.primary,
+                                theme.colorScheme.secondary,
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : null,
+                      color: isCurrent
+                          ? null
+                          : isAnswered
+                          ? theme.colorScheme.primaryContainer
+                          : theme.colorScheme.surfaceVariant,
+                      borderRadius: BorderRadius.circular(10.r),
+                      border: isCurrent
+                          ? null
+                          : Border.all(
+                              color: isAnswered
+                                  ? theme.colorScheme.primary.withValues(
+                                      alpha: 0.3,
+                                    )
+                                  : Colors.transparent,
+                              width: 1.5,
+                            ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${index + 1}',
+                        style: TextStyle(
+                          color: isCurrent
+                              ? Colors.white
+                              : isAnswered
+                              ? theme.colorScheme.primary
+                              : theme.textTheme.bodyMedium?.color,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14.sp,
+                        ),
+                      ),
+                    ),
                   ),
                 );
               },
@@ -326,12 +447,18 @@ class _ProgressHeader extends StatelessWidget {
 
 class _QuestionBody extends StatelessWidget {
   final QuizQuestion question;
+  final int questionNumber;
   final ValueChanged<String> onSelect;
 
-  const _QuestionBody({required this.question, required this.onSelect});
+  const _QuestionBody({
+    required this.question,
+    required this.questionNumber,
+    required this.onSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final answers = <MapEntry<String, String?>>[
       MapEntry('A', question.dapAnA),
       MapEntry('B', question.dapAnB),
@@ -341,19 +468,169 @@ class _QuestionBody extends StatelessWidget {
 
     return ListView(
       children: [
-        Text(question.noiDung, style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 16),
+        // Question Card
+        Card(
+          elevation: 3,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(20.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 12.w,
+                        vertical: 6.h,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            theme.colorScheme.primary,
+                            theme.colorScheme.secondary,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(8.r),
+                      ),
+                      child: Text(
+                        'Câu $questionNumber',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                UIHelpers.verticalSpaceMedium(),
+                Text(
+                  question.noiDung,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16.sp,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        UIHelpers.verticalSpaceMedium(),
+
+        // Answer Options
+        Text(
+          'Chọn đáp án:',
+          style: TextStyle(
+            fontSize: 14.sp,
+            fontWeight: FontWeight.w600,
+            color: theme.textTheme.titleMedium?.color,
+          ),
+        ),
+        UIHelpers.verticalSpaceSmall(),
+
         for (final entry in answers)
-          Card(
-            child: RadioListTile<String>(
-              value: entry.key,
-              groupValue: question.selectedAnswer,
-              title: Text(entry.value!),
-              onChanged: (value) {
-                if (value != null) {
-                  onSelect(value);
-                }
-              },
+          Padding(
+            padding: EdgeInsets.only(bottom: 12.h),
+            child: Material(
+              elevation: question.selectedAnswer == entry.key ? 3 : 1,
+              borderRadius: BorderRadius.circular(12.r),
+              child: InkWell(
+                onTap: () => onSelect(entry.key),
+                borderRadius: BorderRadius.circular(12.r),
+                child: Container(
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(
+                      color: question.selectedAnswer == entry.key
+                          ? theme.colorScheme.primary
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                    gradient: question.selectedAnswer == entry.key
+                        ? LinearGradient(
+                            colors: [
+                              theme.colorScheme.primary.withValues(alpha: 0.1),
+                              theme.colorScheme.secondary.withValues(
+                                alpha: 0.1,
+                              ),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : null,
+                  ),
+                  child: Row(
+                    children: [
+                      // Option Letter
+                      Container(
+                        width: 36.w,
+                        height: 36.h,
+                        decoration: BoxDecoration(
+                          gradient: question.selectedAnswer == entry.key
+                              ? LinearGradient(
+                                  colors: [
+                                    theme.colorScheme.primary,
+                                    theme.colorScheme.secondary,
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )
+                              : null,
+                          color: question.selectedAnswer == entry.key
+                              ? null
+                              : theme.colorScheme.surfaceVariant,
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                        child: Center(
+                          child: Text(
+                            entry.key,
+                            style: TextStyle(
+                              color: question.selectedAnswer == entry.key
+                                  ? Colors.white
+                                  : theme.textTheme.bodyLarge?.color,
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      UIHelpers.horizontalSpaceMedium(),
+
+                      // Option Text
+                      Expanded(
+                        child: Text(
+                          entry.value!,
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: question.selectedAnswer == entry.key
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            color: question.selectedAnswer == entry.key
+                                ? theme.colorScheme.primary
+                                : theme.textTheme.bodyLarge?.color,
+                          ),
+                        ),
+                      ),
+
+                      // Check Icon
+                      if (question.selectedAnswer == entry.key)
+                        Icon(
+                          Icons.check_circle,
+                          color: theme.colorScheme.primary,
+                          size: 24.sp,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
       ],
@@ -368,6 +645,7 @@ class _QuizControls extends StatelessWidget {
   final VoidCallback? onNext;
   final VoidCallback? onSubmit;
   final bool isLast;
+  final bool submitting;
 
   const _QuizControls({
     required this.canGoBack,
@@ -376,25 +654,66 @@ class _QuizControls extends StatelessWidget {
     required this.onNext,
     required this.onSubmit,
     required this.isLast,
+    required this.submitting,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 24.h),
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10.r,
+            offset: Offset(0, -2.h),
+          ),
+        ],
+      ),
       child: Row(
         children: [
+          // Back Button
           Expanded(
-            child: OutlinedButton(
+            child: OutlinedButton.icon(
               onPressed: canGoBack ? onBack : null,
-              child: const Text('Trước'),
+              icon: Icon(Icons.arrow_back, size: 18.sp),
+              label: const Text('Trước'),
+              style: OutlinedButton.styleFrom(
+                padding: EdgeInsets.symmetric(vertical: 14.h),
+              ),
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: 16.w),
+
+          // Next/Submit Button
           Expanded(
-            child: FilledButton(
+            flex: isLast ? 2 : 1,
+            child: FilledButton.icon(
               onPressed: isLast ? onSubmit : (canGoNext ? onNext : null),
-              child: Text(isLast ? 'Nộp bài' : 'Tiếp'),
+              icon: submitting
+                  ? SizedBox(
+                      width: 18.w,
+                      height: 18.h,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.w,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Icon(
+                      isLast ? Icons.check_circle_outline : Icons.arrow_forward,
+                      size: 18.sp,
+                    ),
+              label: Text(
+                submitting ? 'Đang nộp bài...' : (isLast ? 'Nộp bài' : 'Tiếp'),
+                style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600),
+              ),
+              style: FilledButton.styleFrom(
+                padding: EdgeInsets.symmetric(vertical: 14.h),
+                backgroundColor: isLast ? Colors.green.shade600 : null,
+              ),
             ),
           ),
         ],

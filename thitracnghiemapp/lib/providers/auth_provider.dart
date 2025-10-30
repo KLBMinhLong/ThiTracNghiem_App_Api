@@ -44,6 +44,10 @@ class AuthProvider extends ChangeNotifier {
       return;
     }
     _setLoading(true);
+
+    // Ensure splash screen shows for at least 2 seconds
+    final startTime = DateTime.now();
+
     final session = await _tokenStorage.read();
     if (session != null && !session.isExpired) {
       _session = session;
@@ -67,6 +71,14 @@ class AuthProvider extends ChangeNotifier {
       _session = null;
       _apiClient.updateToken(null);
     }
+
+    // Calculate remaining time to show splash screen
+    final elapsed = DateTime.now().difference(startTime);
+    final minimumDuration = const Duration(seconds: 2);
+    if (elapsed < minimumDuration) {
+      await Future.delayed(minimumDuration - elapsed);
+    }
+
     _initialized = true;
     _setLoading(false);
   }

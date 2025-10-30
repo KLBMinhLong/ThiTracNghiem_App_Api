@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/cau_hoi.dart';
@@ -14,6 +15,7 @@ import '../../providers/chu_de_provider.dart';
 import '../../providers/de_thi_provider.dart';
 import '../../providers/lien_he_provider.dart';
 import '../../providers/users_provider.dart';
+import '../../utils/ui_helpers.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -30,6 +32,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _userPage = 1;
   int _examPage = 1;
   bool _isImportingQuestions = false;
+  bool _showQuestionFilters = false;
+  bool _showExamFilters = false;
   int? _selectedTopicForImport;
   int? _examTopicFilterId;
   String? _examStatusFilter; // 'Mo', 'Dong', or null for all
@@ -142,41 +146,130 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         final useRail = constraints.maxWidth > 900;
         final body = _buildSectionBody(_selectedIndex);
         return Scaffold(
-          appBar: AppBar(title: const Text('Bảng điều khiển quản trị')),
+          backgroundColor: Colors.grey.shade50,
+          appBar: AppBar(
+            elevation: 0,
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.grey.shade800,
+            title: Row(
+              children: [
+                Container(
+                  width: 36.w,
+                  height: 36.w,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Theme.of(context).colorScheme.primary,
+                        Theme.of(context).colorScheme.secondary,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: Icon(
+                    Icons.admin_panel_settings,
+                    size: 20.sp,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(width: 12.w),
+                Text(
+                  'Bảng điều khiển quản trị',
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+              ],
+            ),
+          ),
           body: useRail
               ? Row(
                   children: [
-                    NavigationRail(
-                      selectedIndex: _selectedIndex,
-                      onDestinationSelected: (index) =>
-                          setState(() => _selectedIndex = index),
-                      labelType: NavigationRailLabelType.all,
-                      destinations: [
-                        for (final section in sections)
-                          NavigationRailDestination(
-                            icon: Icon(section.icon),
-                            label: Text(section.title),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 10,
+                            offset: const Offset(2, 0),
                           ),
-                      ],
+                        ],
+                      ),
+                      child: NavigationRail(
+                        selectedIndex: _selectedIndex,
+                        onDestinationSelected: (index) =>
+                            setState(() => _selectedIndex = index),
+                        labelType: NavigationRailLabelType.all,
+                        backgroundColor: Colors.white,
+                        selectedIconTheme: IconThemeData(
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 28.sp,
+                        ),
+                        unselectedIconTheme: IconThemeData(
+                          color: Colors.grey.shade600,
+                          size: 24.sp,
+                        ),
+                        selectedLabelTextStyle: TextStyle(
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        unselectedLabelTextStyle: TextStyle(
+                          fontSize: 11.sp,
+                          color: Colors.grey.shade600,
+                        ),
+                        destinations: [
+                          for (final section in sections)
+                            NavigationRailDestination(
+                              icon: Icon(section.icon),
+                              label: Text(section.title),
+                            ),
+                        ],
+                      ),
                     ),
-                    const VerticalDivider(width: 1),
                     Expanded(child: body),
                   ],
                 )
               : Column(
                   children: [
                     Expanded(child: body),
-                    NavigationBar(
-                      selectedIndex: _selectedIndex,
-                      onDestinationSelected: (index) =>
-                          setState(() => _selectedIndex = index),
-                      destinations: [
-                        for (final section in sections)
-                          NavigationDestination(
-                            icon: Icon(section.icon),
-                            label: section.title,
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, -2),
                           ),
-                      ],
+                        ],
+                      ),
+                      child: NavigationBar(
+                        selectedIndex: _selectedIndex,
+                        onDestinationSelected: (index) =>
+                            setState(() => _selectedIndex = index),
+                        backgroundColor: Colors.white,
+                        indicatorColor: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.1),
+                        labelBehavior:
+                            NavigationDestinationLabelBehavior.alwaysShow,
+                        height: 64.h,
+                        destinations: [
+                          for (final section in sections)
+                            NavigationDestination(
+                              icon: Icon(section.icon, size: 22.sp),
+                              selectedIcon: Icon(
+                                section.icon,
+                                size: 24.sp,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              label: section.title,
+                            ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -206,123 +299,503 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Consumer<UsersProvider>(
       builder: (context, provider, _) {
         final response = provider.users;
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _userKeywordController,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.search),
-                        hintText: 'Tìm kiếm theo tên hoặc email',
+        return Container(
+          color: Colors.grey.shade50,
+          child: Padding(
+            padding: EdgeInsets.all(16.w),
+            child: Column(
+              children: [
+                // Header với search và actions
+                Container(
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12.r),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
                       ),
-                      onSubmitted: (_) => _searchUsers(),
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  FilledButton.icon(
-                    onPressed: () => _showCreateUserDialog(),
-                    icon: const Icon(Icons.person_add_alt_1),
-                    label: const Text('Thêm người dùng'),
-                  ),
-                  const SizedBox(width: 12),
-                  FilledButton.icon(
-                    onPressed: _searchUsers,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Tải lại'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              if (provider.isLoading)
-                const Expanded(
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (response == null)
-                const Expanded(
-                  child: Center(child: Text('Không có dữ liệu người dùng')),
-                )
-              else
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: _searchUsers,
-                    child: ListView.separated(
-                      itemCount: response.items.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final user = response.items[index];
-                        return Card(
-                          child: ListTile(
-                            title: Text(
-                              user.fullName.isNotEmpty
-                                  ? user.fullName
-                                  : user.userName,
+                  child: Column(
+                    children: [
+                      // Search field (full width)
+                      Container(
+                        height: 48.h,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(12.r),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: TextField(
+                          controller: _userKeywordController,
+                          decoration: InputDecoration(
+                            prefixIcon: Icon(
+                              Icons.search,
+                              size: 20.sp,
+                              color: Colors.grey.shade600,
                             ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(user.email),
-                                Text('Quyền: ${user.roles.join(', ')}'),
-                                Text(user.isLocked ? 'Đã khoá' : 'Hoạt động'),
-                              ],
+                            hintText: 'Tìm kiếm theo tên hoặc email...',
+                            hintStyle: TextStyle(
+                              fontSize: 13.sp,
+                              color: Colors.grey.shade400,
                             ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined),
-                                  onPressed: () => _showUserDialog(user),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline),
-                                  onPressed: () => _deleteUser(user),
-                                ),
-                              ],
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16.w,
+                              vertical: 14.h,
                             ),
                           ),
-                        );
-                      },
-                    ),
+                          style: TextStyle(fontSize: 13.sp),
+                          onSubmitted: (_) => _searchUsers(),
+                        ),
+                      ),
+                      SizedBox(height: 12.h),
+                      // Action buttons row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildActionButton(
+                              onTap: () => _showCreateUserDialog(),
+                              icon: Icons.person_add_alt_1,
+                              label: 'Thêm tài khoản',
+                              isPrimary: true,
+                            ),
+                          ),
+                          SizedBox(width: 12.w),
+                          Expanded(
+                            child: _buildActionButton(
+                              onTap: _searchUsers,
+                              icon: Icons.refresh,
+                              label: 'Tải lại',
+                              isPrimary: false,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              if (response != null)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      onPressed: _userPage > 1
-                          ? () {
-                              setState(() => _userPage--);
-                              provider.fetchUsers(
-                                keyword: _userKeywordController.text.trim(),
-                                page: _userPage,
-                              );
-                            }
-                          : null,
-                      icon: const Icon(Icons.chevron_left),
+                SizedBox(height: 16.h),
+
+                // Content
+                if (provider.isLoading)
+                  const Expanded(
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (response == null)
+                  Expanded(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 80.w,
+                            height: 80.w,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.grey.shade200,
+                                  Colors.grey.shade300,
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(20.r),
+                            ),
+                            child: Icon(
+                              Icons.people_outline,
+                              size: 40.sp,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          SizedBox(height: 16.h),
+                          Text(
+                            'Không có dữ liệu người dùng',
+                            style: TextStyle(
+                              fontSize: 15.sp,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    Text('Trang $_userPage'),
-                    IconButton(
-                      onPressed: response.isLastPage
-                          ? null
-                          : () {
-                              setState(() => _userPage++);
-                              provider.fetchUsers(
-                                keyword: _userKeywordController.text.trim(),
-                                page: _userPage,
-                              );
-                            },
-                      icon: const Icon(Icons.chevron_right),
+                  )
+                else
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: _searchUsers,
+                      child: ListView.separated(
+                        itemCount: response.items.length,
+                        separatorBuilder: (_, __) => SizedBox(height: 12.h),
+                        itemBuilder: (context, index) {
+                          final user = response.items[index];
+                          final isAdmin = user.roles.any(
+                            (role) => role.toLowerCase() == 'admin',
+                          );
+                          return Card(
+                            elevation: 1,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                            child: InkWell(
+                              onTap: () => _showUserDialog(user),
+                              borderRadius: BorderRadius.circular(12.r),
+                              child: Padding(
+                                padding: EdgeInsets.all(16.w),
+                                child: Row(
+                                  children: [
+                                    // Avatar
+                                    Container(
+                                      width: 48.w,
+                                      height: 48.w,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: isAdmin
+                                              ? [
+                                                  Colors.purple.shade400,
+                                                  Colors.purple.shade600,
+                                                ]
+                                              : [
+                                                  Colors.blue.shade400,
+                                                  Colors.blue.shade600,
+                                                ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          12.r,
+                                        ),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          user.userName
+                                              .substring(0, 1)
+                                              .toUpperCase(),
+                                          style: TextStyle(
+                                            fontSize: 20.sp,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: 16.w),
+
+                                    // Info
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Flexible(
+                                                child: Text(
+                                                  user.fullName.isNotEmpty
+                                                      ? user.fullName
+                                                      : user.userName,
+                                                  style: TextStyle(
+                                                    fontSize: 14.sp,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              if (isAdmin) ...[
+                                                SizedBox(width: 8.w),
+                                                _buildBadge(
+                                                  'Admin',
+                                                  Colors.purple,
+                                                ),
+                                              ],
+                                              if (user.isLocked) ...[
+                                                SizedBox(width: 8.w),
+                                                _buildBadge('Khoá', Colors.red),
+                                              ],
+                                            ],
+                                          ),
+                                          if (user.email.isNotEmpty) ...[
+                                            SizedBox(height: 4.h),
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.email_outlined,
+                                                  size: 12.sp,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                                SizedBox(width: 6.w),
+                                                Flexible(
+                                                  child: Text(
+                                                    user.email,
+                                                    style: TextStyle(
+                                                      fontSize: 12.sp,
+                                                      color:
+                                                          Colors.grey.shade600,
+                                                    ),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Actions
+                                    PopupMenuButton<String>(
+                                      icon: Icon(
+                                        Icons.more_vert,
+                                        size: 20.sp,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          12.r,
+                                        ),
+                                      ),
+                                      itemBuilder: (context) => [
+                                        _buildPopupMenuItem(
+                                          'edit',
+                                          Icons.edit_outlined,
+                                          'Chỉnh sửa',
+                                          Colors.blue.shade700,
+                                        ),
+                                        _buildPopupMenuItem(
+                                          'delete',
+                                          Icons.delete_outline,
+                                          'Xoá',
+                                          Colors.red.shade700,
+                                        ),
+                                      ],
+                                      onSelected: (value) {
+                                        if (value == 'edit') {
+                                          _showUserDialog(user);
+                                        } else if (value == 'delete') {
+                                          _deleteUser(user);
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  ],
-                ),
-            ],
+                  ),
+
+                // Pagination
+                if (response != null)
+                  _buildPagination(
+                    response.isLastPage,
+                    _userPage,
+                    () {
+                      setState(() => _userPage--);
+                      provider.fetchUsers(
+                        keyword: _userKeywordController.text.trim().isEmpty
+                            ? null
+                            : _userKeywordController.text.trim(),
+                        page: _userPage,
+                      );
+                    },
+                    () {
+                      setState(() => _userPage++);
+                      provider.fetchUsers(
+                        keyword: _userKeywordController.text.trim().isEmpty
+                            ? null
+                            : _userKeywordController.text.trim(),
+                        page: _userPage,
+                      );
+                    },
+                  ),
+              ],
+            ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildActionButton({
+    required VoidCallback onTap,
+    required IconData icon,
+    required String label,
+    required bool isPrimary,
+  }) {
+    return Container(
+      constraints: BoxConstraints(minHeight: 48.h),
+      decoration: BoxDecoration(
+        gradient: isPrimary
+            ? LinearGradient(
+                colors: [
+                  Theme.of(context).colorScheme.primary,
+                  Theme.of(context).colorScheme.secondary,
+                ],
+              )
+            : null,
+        color: isPrimary ? null : Colors.white,
+        borderRadius: BorderRadius.circular(12.r),
+        border: isPrimary
+            ? null
+            : Border.all(
+                color: Theme.of(context).colorScheme.primary,
+                width: 1.5,
+              ),
+        boxShadow: isPrimary
+            ? [
+                BoxShadow(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12.r),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 18.sp,
+                  color: isPrimary
+                      ? Colors.white
+                      : Theme.of(context).colorScheme.primary,
+                ),
+                SizedBox(width: 8.w),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w600,
+                    color: isPrimary
+                        ? Colors.white
+                        : Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBadge(String label, MaterialColor colorSwatch) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+      decoration: BoxDecoration(
+        gradient: label == 'Khoá'
+            ? null
+            : LinearGradient(colors: [colorSwatch[400]!, colorSwatch[600]!]),
+        color: label == 'Khoá' ? colorSwatch[50] : null,
+        borderRadius: BorderRadius.circular(6.r),
+        border: label == 'Khoá' ? Border.all(color: colorSwatch[300]!) : null,
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10.sp,
+          fontWeight: FontWeight.bold,
+          color: label == 'Khoá' ? colorSwatch[700] : Colors.white,
+        ),
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _buildPopupMenuItem(
+    String value,
+    IconData icon,
+    String label,
+    Color color,
+  ) {
+    return PopupMenuItem(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, size: 18.sp, color: color),
+          SizedBox(width: 12.w),
+          Text(label, style: TextStyle(fontSize: 13.sp)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPagination(
+    bool isLastPage,
+    int currentPage,
+    VoidCallback onPrevious,
+    VoidCallback onNext,
+  ) {
+    return Container(
+      margin: EdgeInsets.only(top: 16.h),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildPaginationButton(
+            icon: Icons.chevron_left,
+            enabled: currentPage > 1,
+            onPressed: onPrevious,
+          ),
+          SizedBox(width: 16.w),
+          Text(
+            'Trang $currentPage',
+            style: TextStyle(
+              fontSize: 13.sp,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade700,
+            ),
+          ),
+          SizedBox(width: 16.w),
+          _buildPaginationButton(
+            icon: Icons.chevron_right,
+            enabled: !isLastPage,
+            onPressed: onNext,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaginationButton({
+    required IconData icon,
+    required bool enabled,
+    required VoidCallback onPressed,
+  }) {
+    return Container(
+      width: 36.w,
+      height: 36.w,
+      decoration: BoxDecoration(
+        color: enabled
+            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+            : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(8.r),
+      ),
+      child: IconButton(
+        onPressed: enabled ? onPressed : null,
+        icon: Icon(
+          icon,
+          size: 20.sp,
+          color: enabled
+              ? Theme.of(context).colorScheme.primary
+              : Colors.grey.shade400,
+        ),
+        padding: EdgeInsets.zero,
+      ),
     );
   }
 
@@ -488,77 +961,255 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         (t.moTa ?? '').toLowerCase().contains(keyword),
                   )
                   .toList(growable: false);
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _topicSearchController,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.search),
-                        hintText: 'Tìm kiếm chủ đề theo tên hoặc mô tả',
+        return Container(
+          color: Colors.grey.shade50,
+          child: Padding(
+            padding: EdgeInsets.all(16.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header với search
+                Container(
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12.r),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
                       ),
-                      onChanged: (_) => setState(() {}),
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  IconButton(
-                    tooltip: 'Xoá tìm kiếm',
-                    onPressed: () {
-                      if (_topicSearchController.text.isEmpty) return;
-                      _topicSearchController.clear();
-                      setState(() {});
-                    },
-                    icon: const Icon(Icons.clear),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton.icon(
-                  onPressed: () => _showTopicDialog(),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Thêm chủ đề'),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: provider.isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : ListView.separated(
-                        itemCount: filteredTopics.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final topic = filteredTopics[index];
-                          return Card(
-                            child: ListTile(
-                              title: Text(topic.tenChuDe),
-                              subtitle: Text(topic.moTa ?? 'Không có mô tả'),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.edit_outlined),
-                                    onPressed: () =>
-                                        _showTopicDialog(topic: topic),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline),
-                                    onPressed: () => _deleteTopic(topic.id),
-                                  ),
-                                ],
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          height: 48.h,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12.r),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: TextField(
+                            controller: _topicSearchController,
+                            decoration: InputDecoration(
+                              prefixIcon: Icon(
+                                Icons.search,
+                                size: 20.sp,
+                                color: Colors.grey.shade600,
+                              ),
+                              hintText: 'Tìm kiếm chủ đề theo tên hoặc mô tả',
+                              hintStyle: TextStyle(
+                                fontSize: 13.sp,
+                                color: Colors.grey.shade400,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16.w,
+                                vertical: 14.h,
                               ),
                             ),
-                          );
-                        },
+                            style: TextStyle(fontSize: 13.sp),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
                       ),
-              ),
-            ],
+                      if (_topicSearchController.text.isNotEmpty) ...[
+                        SizedBox(width: 12.w),
+                        Container(
+                          width: 48.w,
+                          height: 48.h,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          child: IconButton(
+                            tooltip: 'Xoá tìm kiếm',
+                            onPressed: () {
+                              _topicSearchController.clear();
+                              setState(() {});
+                            },
+                            icon: Icon(
+                              Icons.clear,
+                              size: 20.sp,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
+                      ],
+                      SizedBox(width: 12.w),
+                      _buildActionButton(
+                        onTap: () => _showTopicDialog(),
+                        icon: Icons.add,
+                        label: 'Thêm chủ đề',
+                        isPrimary: true,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 16.h),
+
+                // Content
+                Expanded(
+                  child: provider.isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : filteredTopics.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 80.w,
+                                height: 80.w,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.grey.shade200,
+                                      Colors.grey.shade300,
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(20.r),
+                                ),
+                                child: Icon(
+                                  Icons.category_outlined,
+                                  size: 40.sp,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              SizedBox(height: 16.h),
+                              Text(
+                                keyword.isEmpty
+                                    ? 'Chưa có chủ đề nào'
+                                    : 'Không tìm thấy chủ đề',
+                                style: TextStyle(
+                                  fontSize: 15.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: filteredTopics.length,
+                          separatorBuilder: (_, __) => SizedBox(height: 12.h),
+                          itemBuilder: (context, index) {
+                            final topic = filteredTopics[index];
+                            return Card(
+                              elevation: 1,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12.r),
+                              ),
+                              child: InkWell(
+                                onTap: () => _showTopicDialog(topic: topic),
+                                borderRadius: BorderRadius.circular(12.r),
+                                child: Padding(
+                                  padding: EdgeInsets.all(16.w),
+                                  child: Row(
+                                    children: [
+                                      // Icon
+                                      Container(
+                                        width: 48.w,
+                                        height: 48.w,
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
+                                              Theme.of(
+                                                context,
+                                              ).colorScheme.secondary,
+                                            ],
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            12.r,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          Icons.folder_outlined,
+                                          size: 24.sp,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      SizedBox(width: 16.w),
+
+                                      // Info
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              topic.tenChuDe,
+                                              style: TextStyle(
+                                                fontSize: 14.sp,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            if (topic.moTa != null &&
+                                                topic.moTa!.isNotEmpty) ...[
+                                              SizedBox(height: 4.h),
+                                              Text(
+                                                topic.moTa!,
+                                                style: TextStyle(
+                                                  fontSize: 12.sp,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+
+                                      // Actions
+                                      PopupMenuButton<String>(
+                                        icon: Icon(
+                                          Icons.more_vert,
+                                          size: 20.sp,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12.r,
+                                          ),
+                                        ),
+                                        itemBuilder: (context) => [
+                                          _buildPopupMenuItem(
+                                            'edit',
+                                            Icons.edit_outlined,
+                                            'Chỉnh sửa',
+                                            Colors.blue.shade700,
+                                          ),
+                                          _buildPopupMenuItem(
+                                            'delete',
+                                            Icons.delete_outline,
+                                            'Xoá',
+                                            Colors.red.shade700,
+                                          ),
+                                        ],
+                                        onSelected: (value) {
+                                          if (value == 'edit') {
+                                            _showTopicDialog(topic: topic);
+                                          } else if (value == 'delete') {
+                                            _deleteTopic(topic.id);
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -595,221 +1246,623 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         final isInitialLoading =
             questionProvider.isLoading && questions.isEmpty;
 
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Align(
-                alignment: Alignment.centerRight,
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  alignment: WrapAlignment.end,
-                  children: [
-                    SizedBox(
-                      width: 240,
-                      child: InputDecorator(
-                        decoration: const InputDecoration(
-                          labelText: 'Lọc câu hỏi theo chủ đề',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
+        return Container(
+          color: Colors.grey.shade50,
+          child: Padding(
+            padding: EdgeInsets.all(16.w),
+            child: Column(
+              children: [
+                // Filters và Actions
+                Container(
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12.r),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Main action row (always visible)
+                      Row(
+                        children: [
+                          // Filter toggle button
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              setState(
+                                () => _showQuestionFilters =
+                                    !_showQuestionFilters,
+                              );
+                            },
+                            icon: Icon(
+                              _showQuestionFilters
+                                  ? Icons.filter_alt
+                                  : Icons.filter_alt_outlined,
+                              size: 18.sp,
+                            ),
+                            label: Text(
+                              'Lọc',
+                              style: TextStyle(fontSize: 13.sp),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 12.w,
+                                vertical: 12.h,
+                              ),
+                            ),
                           ),
-                        ),
-                        child: topics.isEmpty
-                            ? const Text('Chưa có chủ đề')
-                            : DropdownButtonHideUnderline(
-                                child: DropdownButton<int?>(
-                                  value: filterValue,
-                                  isExpanded: true,
-                                  onChanged: questionProvider.isLoading
-                                      ? null
-                                      : (value) {
-                                          questionProvider.setTopicFilter(
-                                            value,
-                                          );
-                                        },
-                                  items: [
-                                    DropdownMenuItem<int?>(
-                                      value: null,
-                                      child: const Text('Tất cả chủ đề'),
+                          const Spacer(),
+                          _buildActionButton(
+                            onTap: () => _showQuestionDialog(),
+                            icon: Icons.add,
+                            label: 'Thêm câu hỏi',
+                            isPrimary: true,
+                          ),
+                        ],
+                      ),
+
+                      // Expandable filters
+                      if (_showQuestionFilters) ...[
+                        SizedBox(height: 12.h),
+                        Wrap(
+                          spacing: 12.w,
+                          runSpacing: 12.h,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            // Filter dropdown
+                            SizedBox(
+                              width: 220.w,
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 12.w,
+                                  vertical: 4.h,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Lọc theo chủ đề',
+                                      style: TextStyle(
+                                        fontSize: 11.sp,
+                                        color: Colors.grey.shade600,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
-                                    for (final topic in topics)
-                                      DropdownMenuItem<int?>(
-                                        value: topic.id,
-                                        child: Text(topic.tenChuDe),
-                                      ),
+                                    topics.isEmpty
+                                        ? Text(
+                                            'Chưa có chủ đề',
+                                            style: TextStyle(
+                                              fontSize: 13.sp,
+                                              color: Colors.grey.shade400,
+                                            ),
+                                          )
+                                        : DropdownButtonHideUnderline(
+                                            child: DropdownButton<int?>(
+                                              value: filterValue,
+                                              isExpanded: true,
+                                              isDense: true,
+                                              style: TextStyle(
+                                                fontSize: 13.sp,
+                                                color: Colors.grey.shade800,
+                                              ),
+                                              onChanged:
+                                                  questionProvider.isLoading
+                                                  ? null
+                                                  : (value) {
+                                                      questionProvider
+                                                          .setTopicFilter(
+                                                            value,
+                                                          );
+                                                    },
+                                              items: [
+                                                DropdownMenuItem<int?>(
+                                                  value: null,
+                                                  child: Text('Tất cả chủ đề'),
+                                                ),
+                                                for (final topic in topics)
+                                                  DropdownMenuItem<int?>(
+                                                    value: topic.id,
+                                                    child: Text(topic.tenChuDe),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
                                   ],
                                 ),
                               ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 240,
-                      child: InputDecorator(
-                        decoration: const InputDecoration(
-                          labelText: 'Chủ đề cho file Excel',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
+                            ),
+
+                            // Import topic dropdown
+                            SizedBox(
+                              width: 180.w,
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 12.w,
+                                  vertical: 4.h,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Chủ đề Excel',
+                                      style: TextStyle(
+                                        fontSize: 11.sp,
+                                        color: Colors.grey.shade600,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    topics.isEmpty
+                                        ? Text(
+                                            'Chưa có chủ đề',
+                                            style: TextStyle(
+                                              fontSize: 13.sp,
+                                              color: Colors.grey.shade400,
+                                            ),
+                                          )
+                                        : DropdownButtonHideUnderline(
+                                            child: DropdownButton<int>(
+                                              value: _selectedTopicForImport,
+                                              isExpanded: true,
+                                              isDense: true,
+                                              style: TextStyle(
+                                                fontSize: 13.sp,
+                                                color: Colors.grey.shade800,
+                                              ),
+                                              onChanged: _isImportingQuestions
+                                                  ? null
+                                                  : (value) => setState(
+                                                      () =>
+                                                          _selectedTopicForImport =
+                                                              value,
+                                                    ),
+                                              items: [
+                                                for (final topic in topics)
+                                                  DropdownMenuItem<int>(
+                                                    value: topic.id,
+                                                    child: Text(topic.tenChuDe),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            // Import button
+                            OutlinedButton.icon(
+                              onPressed:
+                                  (_isImportingQuestions || topics.isEmpty)
+                                  ? null
+                                  : _importQuestions,
+                              icon: _isImportingQuestions
+                                  ? SizedBox(
+                                      width: 18.w,
+                                      height: 18.w,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.upload_file_outlined,
+                                      size: 18.sp,
+                                    ),
+                              label: Text(
+                                _isImportingQuestions
+                                    ? 'Đang nhập...'
+                                    : 'Import Excel',
+                                style: TextStyle(fontSize: 13.sp),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 12.w,
+                                  vertical: 12.h,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        child: topics.isEmpty
-                            ? const Text('Chưa có chủ đề')
-                            : DropdownButtonHideUnderline(
-                                child: DropdownButton<int>(
-                                  value: _selectedTopicForImport,
-                                  isExpanded: true,
-                                  onChanged: _isImportingQuestions
-                                      ? null
-                                      : (value) => setState(
-                                          () => _selectedTopicForImport = value,
-                                        ),
-                                  items: [
-                                    for (final topic in topics)
-                                      DropdownMenuItem<int>(
-                                        value: topic.id,
-                                        child: Text(topic.tenChuDe),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                      ),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _isImportingQuestions || topics.isEmpty
-                          ? null
-                          : _importQuestions,
-                      icon: _isImportingQuestions
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.upload_file_outlined),
-                      label: Text(
-                        _isImportingQuestions
-                            ? 'Đang nhập...'
-                            : 'Nhập từ Excel',
-                      ),
-                    ),
-                    FilledButton.icon(
-                      onPressed: () => _showQuestionDialog(),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Thêm câu hỏi'),
-                    ),
-                  ],
-                ),
-              ),
-              if (errorText != null)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Text(
-                      errorText,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
+                      ],
+                    ],
                   ),
                 ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: isInitialLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : RefreshIndicator(
-                        onRefresh: () => questionProvider.refreshCauHois(
-                          topicId: questionProvider.selectedTopicId,
-                        ),
-                        child: questions.isEmpty
-                            ? ListView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                children: const [
-                                  SizedBox(
-                                    height: 240,
-                                    child: Center(
-                                      child: Text('Không có câu hỏi phù hợp.'),
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : ListView.separated(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                itemCount:
-                                    questions.length +
-                                    (questionProvider.isLoadingMore ||
-                                            questionProvider.canLoadMore
-                                        ? 1
-                                        : 0),
-                                separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 12),
-                                itemBuilder: (context, index) {
-                                  if (index >= questions.length) {
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 16,
-                                      ),
-                                      child: Center(
-                                        child: questionProvider.isLoadingMore
-                                            ? const CircularProgressIndicator()
-                                            : OutlinedButton.icon(
-                                                onPressed:
-                                                    questionProvider.canLoadMore
-                                                    ? () {
-                                                        questionProvider
-                                                            .loadMoreCauHois();
-                                                      }
-                                                    : null,
-                                                icon: const Icon(
-                                                  Icons.expand_more,
-                                                ),
-                                                label: const Text(
-                                                  'Tải thêm câu hỏi',
-                                                ),
-                                              ),
-                                      ),
-                                    );
-                                  }
 
-                                  final question = questions[index];
-                                  return Card(
-                                    child: ListTile(
-                                      title: Text(question.noiDung),
-                                      subtitle: Text(
-                                        'Đáp án đúng: ${question.dapAnDung} | Chủ đề: ${question.chuDe?.tenChuDe ?? ''}',
-                                      ),
-                                      trailing: Row(
-                                        mainAxisSize: MainAxisSize.min,
+                // Error message
+                if (errorText != null)
+                  Container(
+                    margin: EdgeInsets.only(top: 12.h),
+                    padding: EdgeInsets.all(12.w),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(10.r),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 18.sp,
+                          color: Colors.red.shade700,
+                        ),
+                        SizedBox(width: 8.w),
+                        Expanded(
+                          child: Text(
+                            errorText,
+                            style: TextStyle(
+                              fontSize: 12.sp,
+                              color: Colors.red.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                SizedBox(height: 16.h),
+
+                // Questions List
+                Expanded(
+                  child: isInitialLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : RefreshIndicator(
+                          onRefresh: () => questionProvider.refreshCauHois(
+                            topicId: questionProvider.selectedTopicId,
+                          ),
+                          child: questions.isEmpty
+                              ? ListView(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  children: [
+                                    SizedBox(height: 80.h),
+                                    Center(
+                                      child: Column(
                                         children: [
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.edit_outlined,
+                                          Container(
+                                            width: 80.w,
+                                            height: 80.w,
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                colors: [
+                                                  Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary,
+                                                  Theme.of(
+                                                    context,
+                                                  ).colorScheme.secondary,
+                                                ],
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(20.r),
                                             ),
-                                            onPressed: () =>
-                                                _showQuestionDialog(
-                                                  question: question,
-                                                ),
+                                            child: Icon(
+                                              Icons.quiz_outlined,
+                                              size: 40.sp,
+                                              color: Colors.white,
+                                            ),
                                           ),
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.delete_outline,
+                                          SizedBox(height: 16.h),
+                                          Text(
+                                            'Chưa có câu hỏi',
+                                            style: TextStyle(
+                                              fontSize: 16.sp,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.grey.shade700,
                                             ),
-                                            onPressed: () =>
-                                                _deleteQuestion(question.id),
+                                          ),
+                                          SizedBox(height: 8.h),
+                                          Text(
+                                            filterValue != null
+                                                ? 'Không có câu hỏi cho chủ đề này'
+                                                : 'Hãy thêm câu hỏi mới hoặc nhập từ Excel',
+                                            style: TextStyle(
+                                              fontSize: 13.sp,
+                                              color: Colors.grey.shade500,
+                                            ),
                                           ),
                                         ],
                                       ),
                                     ),
-                                  );
-                                },
-                              ),
-                      ),
-              ),
-            ],
+                                  ],
+                                )
+                              : ListView.separated(
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  itemCount:
+                                      questions.length +
+                                      (questionProvider.isLoadingMore ||
+                                              questionProvider.canLoadMore
+                                          ? 1
+                                          : 0),
+                                  separatorBuilder: (_, __) =>
+                                      SizedBox(height: 12.h),
+                                  itemBuilder: (context, index) {
+                                    if (index >= questions.length) {
+                                      return Padding(
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: 16.h,
+                                        ),
+                                        child: Center(
+                                          child: questionProvider.isLoadingMore
+                                              ? const CircularProgressIndicator()
+                                              : Container(
+                                                  height: 48.h,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          12.r,
+                                                        ),
+                                                    border: Border.all(
+                                                      color:
+                                                          questionProvider
+                                                              .canLoadMore
+                                                          ? Theme.of(context)
+                                                                .colorScheme
+                                                                .primary
+                                                          : Colors
+                                                                .grey
+                                                                .shade300,
+                                                      width: 1.5,
+                                                    ),
+                                                  ),
+                                                  child: Material(
+                                                    color: Colors.transparent,
+                                                    child: InkWell(
+                                                      onTap:
+                                                          questionProvider
+                                                              .canLoadMore
+                                                          ? () {
+                                                              questionProvider
+                                                                  .loadMoreCauHois();
+                                                            }
+                                                          : null,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            12.r,
+                                                          ),
+                                                      child: Padding(
+                                                        padding:
+                                                            EdgeInsets.symmetric(
+                                                              horizontal: 24.w,
+                                                            ),
+                                                        child: Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.min,
+                                                          children: [
+                                                            Icon(
+                                                              Icons.expand_more,
+                                                              size: 18.sp,
+                                                              color:
+                                                                  questionProvider
+                                                                      .canLoadMore
+                                                                  ? Theme.of(
+                                                                          context,
+                                                                        )
+                                                                        .colorScheme
+                                                                        .primary
+                                                                  : Colors
+                                                                        .grey
+                                                                        .shade400,
+                                                            ),
+                                                            SizedBox(
+                                                              width: 8.w,
+                                                            ),
+                                                            Text(
+                                                              'Tải thêm câu hỏi',
+                                                              style: TextStyle(
+                                                                fontSize: 13.sp,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                                color:
+                                                                    questionProvider
+                                                                        .canLoadMore
+                                                                    ? Theme.of(
+                                                                        context,
+                                                                      ).colorScheme.primary
+                                                                    : Colors
+                                                                          .grey
+                                                                          .shade400,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                        ),
+                                      );
+                                    }
+
+                                    final question = questions[index];
+                                    return Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(
+                                          12.r,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.05,
+                                            ),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Padding(
+                                        padding: EdgeInsets.all(16.w),
+                                        child: Row(
+                                          children: [
+                                            // Icon
+                                            Container(
+                                              width: 48.w,
+                                              height: 48.w,
+                                              decoration: BoxDecoration(
+                                                gradient: LinearGradient(
+                                                  colors: [
+                                                    Theme.of(
+                                                      context,
+                                                    ).colorScheme.primary,
+                                                    Theme.of(
+                                                      context,
+                                                    ).colorScheme.secondary,
+                                                  ],
+                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(12.r),
+                                              ),
+                                              child: Icon(
+                                                Icons.quiz_outlined,
+                                                size: 24.sp,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                            SizedBox(width: 16.w),
+
+                                            // Content
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    question.noiDung,
+                                                    style: TextStyle(
+                                                      fontSize: 14.sp,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color:
+                                                          Colors.grey.shade800,
+                                                    ),
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                  SizedBox(height: 6.h),
+                                                  Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons
+                                                            .check_circle_outline,
+                                                        size: 14.sp,
+                                                        color: Colors
+                                                            .green
+                                                            .shade600,
+                                                      ),
+                                                      SizedBox(width: 4.w),
+                                                      Text(
+                                                        'Đáp án: ${question.dapAnDung}',
+                                                        style: TextStyle(
+                                                          fontSize: 12.sp,
+                                                          color: Colors
+                                                              .green
+                                                              .shade700,
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                        ),
+                                                      ),
+                                                      SizedBox(width: 12.w),
+                                                      Icon(
+                                                        Icons.folder_outlined,
+                                                        size: 14.sp,
+                                                        color: Colors
+                                                            .grey
+                                                            .shade600,
+                                                      ),
+                                                      SizedBox(width: 4.w),
+                                                      Flexible(
+                                                        child: Text(
+                                                          question
+                                                                  .chuDe
+                                                                  ?.tenChuDe ??
+                                                              '',
+                                                          style: TextStyle(
+                                                            fontSize: 12.sp,
+                                                            color: Colors
+                                                                .grey
+                                                                .shade600,
+                                                          ),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+
+                                            // Actions
+                                            PopupMenuButton<String>(
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12.r),
+                                              ),
+                                              icon: Icon(
+                                                Icons.more_vert,
+                                                color: Colors.grey.shade600,
+                                                size: 20.sp,
+                                              ),
+                                              onSelected: (value) {
+                                                if (value == 'edit') {
+                                                  _showQuestionDialog(
+                                                    question: question,
+                                                  );
+                                                } else if (value == 'delete') {
+                                                  _deleteQuestion(question.id);
+                                                }
+                                              },
+                                              itemBuilder: (context) => [
+                                                _buildPopupMenuItem(
+                                                  'edit',
+                                                  Icons.edit_outlined,
+                                                  'Sửa',
+                                                  Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary,
+                                                ),
+                                                _buildPopupMenuItem(
+                                                  'delete',
+                                                  Icons.delete_outline,
+                                                  'Xóa',
+                                                  Colors.red.shade600,
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -840,177 +1893,555 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             })
             .toList(growable: false);
 
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Align(
-                alignment: Alignment.centerRight,
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  alignment: WrapAlignment.end,
-                  children: [
-                    SizedBox(
-                      width: 260,
-                      child: TextField(
-                        controller: _examKeywordController,
-                        decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.search),
-                          hintText: 'Tìm kiếm đề thi theo tên',
-                        ),
-                        onChanged: (_) => setState(() {}),
+        return Container(
+          color: Colors.grey.shade50,
+          child: Padding(
+            padding: EdgeInsets.all(16.w),
+            child: Column(
+              children: [
+                // Search và Filters
+                Container(
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12.r),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
                       ),
-                    ),
-                    SizedBox(
-                      width: 220,
-                      child: InputDecorator(
-                        decoration: const InputDecoration(
-                          labelText: 'Lọc theo chủ đề',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Search field (full width)
+                      Container(
+                        height: 48.h,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(12.r),
+                          border: Border.all(color: Colors.grey.shade200),
                         ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<int?>(
-                            value: _examTopicFilterId,
-                            isExpanded: true,
-                            items: [
-                              const DropdownMenuItem<int?>(
-                                value: null,
-                                child: Text('Tất cả chủ đề'),
+                        child: TextField(
+                          controller: _examKeywordController,
+                          decoration: InputDecoration(
+                            prefixIcon: Icon(
+                              Icons.search,
+                              size: 20.sp,
+                              color: Colors.grey.shade600,
+                            ),
+                            suffixIcon: _examKeywordController.text.isNotEmpty
+                                ? GestureDetector(
+                                    onTap: () {
+                                      _examKeywordController.clear();
+                                      setState(() {});
+                                    },
+                                    child: Icon(
+                                      Icons.clear,
+                                      size: 18.sp,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  )
+                                : null,
+                            hintText: 'Tìm kiếm đề thi...',
+                            hintStyle: TextStyle(
+                              fontSize: 13.sp,
+                              color: Colors.grey.shade400,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16.w,
+                              vertical: 14.h,
+                            ),
+                          ),
+                          style: TextStyle(fontSize: 13.sp),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                      SizedBox(height: 12.h),
+                      // Action buttons row
+                      Row(
+                        children: [
+                          // Filter toggle button
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              setState(
+                                () => _showExamFilters = !_showExamFilters,
+                              );
+                            },
+                            icon: Icon(
+                              _showExamFilters
+                                  ? Icons.filter_alt
+                                  : Icons.filter_alt_outlined,
+                              size: 18.sp,
+                            ),
+                            label: Text(
+                              'Lọc',
+                              style: TextStyle(fontSize: 13.sp),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 12.w,
+                                vertical: 12.h,
                               ),
-                              for (final topic in topicProvider.chuDes)
-                                DropdownMenuItem<int?>(
-                                  value: topic.id,
-                                  child: Text(topic.tenChuDe),
+                            ),
+                          ),
+                          const Spacer(),
+                          _buildActionButton(
+                            onTap: () => _showExamDialog(),
+                            icon: Icons.add,
+                            label: 'Thêm đề thi',
+                            isPrimary: true,
+                          ),
+                        ],
+                      ),
+
+                      // Expandable filters
+                      if (_showExamFilters) ...[
+                        SizedBox(height: 12.h),
+                        Row(
+                          children: [
+                            // Topic filter
+                            Expanded(
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 12.w,
+                                  vertical: 4.h,
                                 ),
-                            ],
-                            onChanged: (value) =>
-                                setState(() => _examTopicFilterId = value),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 180,
-                      child: InputDecorator(
-                        decoration: const InputDecoration(
-                          labelText: 'Trạng thái',
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String?>(
-                            value: _examStatusFilter,
-                            isExpanded: true,
-                            items: const [
-                              DropdownMenuItem<String?>(
-                                value: null,
-                                child: Text('Tất cả trạng thái'),
-                              ),
-                              DropdownMenuItem<String?>(
-                                value: 'Mo',
-                                child: Text('Mở'),
-                              ),
-                              DropdownMenuItem<String?>(
-                                value: 'Dong',
-                                child: Text('Đóng'),
-                              ),
-                            ],
-                            onChanged: (value) =>
-                                setState(() => _examStatusFilter = value),
-                          ),
-                        ),
-                      ),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        _examKeywordController.clear();
-                        _examTopicFilterId = null;
-                        _examStatusFilter = null;
-                        setState(() {});
-                      },
-                      icon: const Icon(Icons.filter_alt_off_outlined),
-                      label: const Text('Xoá lọc'),
-                    ),
-                    FilledButton.icon(
-                      onPressed: () => _showExamDialog(),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Thêm đề thi'),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: examProvider.loadingAdmin
-                    ? const Center(child: CircularProgressIndicator())
-                    : ListView.separated(
-                        itemCount: filteredExams.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final exam = filteredExams[index];
-                          final topicName =
-                              topicMap[exam.chuDeId] ??
-                              'Chủ đề ${exam.chuDeId}';
-                          return Card(
-                            child: ListTile(
-                              title: Text(exam.tenDeThi),
-                              subtitle: Text(
-                                'Chủ đề: $topicName | Số câu: ${exam.soCauHoi} | Thời gian: ${exam.thoiGianThi} phút | Trạng thái: ${exam.trangThai}',
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.edit_outlined),
-                                    onPressed: () =>
-                                        _showExamDialog(exam: exam),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete_outline),
-                                    onPressed: () => _deleteExam(exam.id),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Lọc theo chủ đề',
+                                      style: TextStyle(
+                                        fontSize: 11.sp,
+                                        color: Colors.grey.shade600,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    DropdownButtonHideUnderline(
+                                      child: DropdownButton<int?>(
+                                        value: _examTopicFilterId,
+                                        isExpanded: true,
+                                        isDense: true,
+                                        style: TextStyle(
+                                          fontSize: 13.sp,
+                                          color: Colors.grey.shade800,
+                                        ),
+                                        items: [
+                                          DropdownMenuItem<int?>(
+                                            value: null,
+                                            child: Text('Tất cả chủ đề'),
+                                          ),
+                                          for (final topic
+                                              in topicProvider.chuDes)
+                                            DropdownMenuItem<int?>(
+                                              value: topic.id,
+                                              child: Text(topic.tenChuDe),
+                                            ),
+                                        ],
+                                        onChanged: (value) => setState(
+                                          () => _examTopicFilterId = value,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 12.w),
+
+                            // Status filter
+                            Expanded(
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 12.w,
+                                  vertical: 4.h,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Trạng thái',
+                                      style: TextStyle(
+                                        fontSize: 11.sp,
+                                        color: Colors.grey.shade600,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    DropdownButtonHideUnderline(
+                                      child: DropdownButton<String?>(
+                                        value: _examStatusFilter,
+                                        isExpanded: true,
+                                        isDense: true,
+                                        style: TextStyle(
+                                          fontSize: 13.sp,
+                                          color: Colors.grey.shade800,
+                                        ),
+                                        items: const [
+                                          DropdownMenuItem<String?>(
+                                            value: null,
+                                            child: Text('Tất cả'),
+                                          ),
+                                          DropdownMenuItem<String?>(
+                                            value: 'Mo',
+                                            child: Text('Mở'),
+                                          ),
+                                          DropdownMenuItem<String?>(
+                                            value: 'Dong',
+                                            child: Text('Đóng'),
+                                          ),
+                                        ],
+                                        onChanged: (value) => setState(
+                                          () => _examStatusFilter = value,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 12.w),
+
+                            // Clear filters button
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                _examKeywordController.clear();
+                                _examTopicFilterId = null;
+                                _examStatusFilter = null;
+                                setState(() {});
+                              },
+                              icon: Icon(
+                                Icons.filter_alt_off_outlined,
+                                size: 18.sp,
+                              ),
+                              label: Text(
+                                'Xoá lọc',
+                                style: TextStyle(fontSize: 13.sp),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 12.w,
+                                  vertical: 12.h,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                SizedBox(height: 16.h),
+
+                // Exams List
+                Expanded(
+                  child: examProvider.loadingAdmin
+                      ? const Center(child: CircularProgressIndicator())
+                      : filteredExams.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(height: 80.h),
+                            Center(
+                              child: Column(
+                                children: [
+                                  Container(
+                                    width: 80.w,
+                                    height: 80.w,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Theme.of(context).colorScheme.primary,
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.secondary,
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(20.r),
+                                    ),
+                                    child: Icon(
+                                      Icons.description_outlined,
+                                      size: 40.sp,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  SizedBox(height: 16.h),
+                                  Text(
+                                    'Không tìm thấy đề thi',
+                                    style: TextStyle(
+                                      fontSize: 16.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                  SizedBox(height: 8.h),
+                                  Text(
+                                    examKeyword.isNotEmpty
+                                        ? 'Thử tìm kiếm với từ khóa khác'
+                                        : 'Hãy thêm đề thi mới',
+                                    style: TextStyle(
+                                      fontSize: 13.sp,
+                                      color: Colors.grey.shade500,
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
-                          );
-                        },
-                      ),
-              ),
-              if (response != null)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      onPressed: _examPage > 1
-                          ? () {
-                              setState(() => _examPage--);
-                              examProvider.fetchAdminDeThis(page: _examPage);
-                            }
-                          : null,
-                      icon: const Icon(Icons.chevron_left),
-                    ),
-                    Text('Trang $_examPage'),
-                    IconButton(
-                      onPressed: response.isLastPage
-                          ? null
-                          : () {
-                              setState(() => _examPage++);
-                              examProvider.fetchAdminDeThis(page: _examPage);
-                            },
-                      icon: const Icon(Icons.chevron_right),
-                    ),
-                  ],
+                          ],
+                        )
+                      : ListView.separated(
+                          itemCount: filteredExams.length,
+                          separatorBuilder: (_, __) => SizedBox(height: 12.h),
+                          itemBuilder: (context, index) {
+                            final exam = filteredExams[index];
+                            final topicName =
+                                topicMap[exam.chuDeId] ??
+                                'Chủ đề ${exam.chuDeId}';
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12.r),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.05),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Padding(
+                                padding: EdgeInsets.all(16.w),
+                                child: Row(
+                                  children: [
+                                    // Icon
+                                    Container(
+                                      width: 48.w,
+                                      height: 48.w,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.secondary,
+                                          ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          12.r,
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        Icons.description_outlined,
+                                        size: 24.sp,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    SizedBox(width: 16.w),
+
+                                    // Content
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  exam.tenDeThi,
+                                                  style: TextStyle(
+                                                    fontSize: 14.sp,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.grey.shade800,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              SizedBox(width: 8.w),
+                                              Container(
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: 8.w,
+                                                  vertical: 4.h,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: exam.trangThai == 'Mo'
+                                                      ? Colors.green.shade50
+                                                      : Colors.grey.shade100,
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                        6.r,
+                                                      ),
+                                                  border: Border.all(
+                                                    color:
+                                                        exam.trangThai == 'Mo'
+                                                        ? Colors.green.shade300
+                                                        : Colors.grey.shade300,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  exam.trangThai == 'Mo'
+                                                      ? 'Mở'
+                                                      : 'Đóng',
+                                                  style: TextStyle(
+                                                    fontSize: 11.sp,
+                                                    fontWeight: FontWeight.w600,
+                                                    color:
+                                                        exam.trangThai == 'Mo'
+                                                        ? Colors.green.shade700
+                                                        : Colors.grey.shade700,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          SizedBox(height: 6.h),
+                                          Wrap(
+                                            spacing: 12.w,
+                                            runSpacing: 4.h,
+                                            children: [
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.folder_outlined,
+                                                    size: 14.sp,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                  SizedBox(width: 4.w),
+                                                  Text(
+                                                    topicName,
+                                                    style: TextStyle(
+                                                      fontSize: 12.sp,
+                                                      color:
+                                                          Colors.grey.shade600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.quiz_outlined,
+                                                    size: 14.sp,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                  SizedBox(width: 4.w),
+                                                  Text(
+                                                    '${exam.soCauHoi} câu',
+                                                    style: TextStyle(
+                                                      fontSize: 12.sp,
+                                                      color:
+                                                          Colors.grey.shade600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.timer_outlined,
+                                                    size: 14.sp,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                  SizedBox(width: 4.w),
+                                                  Text(
+                                                    '${exam.thoiGianThi} phút',
+                                                    style: TextStyle(
+                                                      fontSize: 12.sp,
+                                                      color:
+                                                          Colors.grey.shade600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Actions
+                                    PopupMenuButton<String>(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          12.r,
+                                        ),
+                                      ),
+                                      icon: Icon(
+                                        Icons.more_vert,
+                                        color: Colors.grey.shade600,
+                                        size: 20.sp,
+                                      ),
+                                      onSelected: (value) {
+                                        if (value == 'edit') {
+                                          _showExamDialog(exam: exam);
+                                        } else if (value == 'delete') {
+                                          _deleteExam(exam.id);
+                                        }
+                                      },
+                                      itemBuilder: (context) => [
+                                        _buildPopupMenuItem(
+                                          'edit',
+                                          Icons.edit_outlined,
+                                          'Sửa',
+                                          Theme.of(context).colorScheme.primary,
+                                        ),
+                                        _buildPopupMenuItem(
+                                          'delete',
+                                          Icons.delete_outline,
+                                          'Xóa',
+                                          Colors.red.shade600,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                 ),
-            ],
+
+                // Pagination
+                if (response != null)
+                  _buildPagination(
+                    response.isLastPage,
+                    _examPage,
+                    () {
+                      setState(() => _examPage--);
+                      examProvider.fetchAdminDeThis(page: _examPage);
+                    },
+                    () {
+                      setState(() => _examPage++);
+                      examProvider.fetchAdminDeThis(page: _examPage);
+                    },
+                  ),
+              ],
+            ),
           ),
         );
       },
@@ -1022,42 +2453,279 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       builder: (context, provider, _) {
         final response = provider.allLienHe;
         final contacts = response?.items ?? const <LienHe>[];
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Tổng ${response?.total ?? contacts.length} liên hệ'),
-              const SizedBox(height: 16),
-              Expanded(
-                child: provider.isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : ListView.separated(
-                        itemCount: contacts.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final contact = contacts[index];
-                          final date = MaterialLocalizations.of(
-                            context,
-                          ).formatFullDate(contact.ngayGui);
-                          return Card(
-                            child: ListTile(
-                              title: Text(contact.tieuDe),
-                              subtitle: Text(
-                                'Người gửi: ${contact.taiKhoan?.fullName.isNotEmpty == true ? contact.taiKhoan!.fullName : (contact.taiKhoan?.userName ?? contact.taiKhoanId)}\nNgày: $date',
-                              ),
-                              isThreeLine: true,
-                              trailing: IconButton(
-                                icon: const Icon(Icons.delete_outline),
-                                onPressed: () => _deleteContact(contact.id),
-                              ),
-                              onTap: () => _showContactDetailDialog(contact),
-                            ),
-                          );
-                        },
+        return Container(
+          color: Colors.grey.shade50,
+          child: Padding(
+            padding: EdgeInsets.all(16.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Container(
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12.r),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
                       ),
-              ),
-            ],
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40.w,
+                        height: 40.w,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Theme.of(context).colorScheme.primary,
+                              Theme.of(context).colorScheme.secondary,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(10.r),
+                        ),
+                        child: Icon(
+                          Icons.mail_outline,
+                          size: 20.sp,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(width: 12.w),
+                      Text(
+                        'Tổng ${response?.total ?? contacts.length} liên hệ',
+                        style: TextStyle(
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 16.h),
+
+                // Contacts List
+                Expanded(
+                  child: provider.isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : contacts.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(height: 80.h),
+                            Center(
+                              child: Column(
+                                children: [
+                                  Container(
+                                    width: 80.w,
+                                    height: 80.w,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Theme.of(context).colorScheme.primary,
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.secondary,
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(20.r),
+                                    ),
+                                    child: Icon(
+                                      Icons.mail_outline,
+                                      size: 40.sp,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  SizedBox(height: 16.h),
+                                  Text(
+                                    'Chưa có liên hệ',
+                                    style: TextStyle(
+                                      fontSize: 16.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                  SizedBox(height: 8.h),
+                                  Text(
+                                    'Người dùng chưa gửi liên hệ nào',
+                                    style: TextStyle(
+                                      fontSize: 13.sp,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.separated(
+                          itemCount: contacts.length,
+                          separatorBuilder: (_, __) => SizedBox(height: 12.h),
+                          itemBuilder: (context, index) {
+                            final contact = contacts[index];
+                            final date = UIHelpers.formatDateVN(
+                              contact.ngayGui,
+                            );
+                            final userName =
+                                contact.taiKhoan?.fullName.isNotEmpty == true
+                                ? contact.taiKhoan!.fullName
+                                : (contact.taiKhoan?.userName ??
+                                      contact.taiKhoanId);
+
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12.r),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.05),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () =>
+                                      _showContactDetailDialog(contact),
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  child: Padding(
+                                    padding: EdgeInsets.all(16.w),
+                                    child: Row(
+                                      children: [
+                                        // Icon
+                                        Container(
+                                          width: 48.w,
+                                          height: 48.w,
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [
+                                                Theme.of(
+                                                  context,
+                                                ).colorScheme.primary,
+                                                Theme.of(
+                                                  context,
+                                                ).colorScheme.secondary,
+                                              ],
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              12.r,
+                                            ),
+                                          ),
+                                          child: Icon(
+                                            Icons.email_outlined,
+                                            size: 24.sp,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        SizedBox(width: 16.w),
+
+                                        // Content
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                contact.tieuDe,
+                                                style: TextStyle(
+                                                  fontSize: 14.sp,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.grey.shade800,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              SizedBox(height: 6.h),
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.person_outline,
+                                                    size: 14.sp,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                  SizedBox(width: 4.w),
+                                                  Flexible(
+                                                    child: Text(
+                                                      userName,
+                                                      style: TextStyle(
+                                                        fontSize: 12.sp,
+                                                        color: Colors
+                                                            .grey
+                                                            .shade600,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              SizedBox(height: 4.h),
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons
+                                                        .calendar_today_outlined,
+                                                    size: 14.sp,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                  SizedBox(width: 4.w),
+                                                  Text(
+                                                    date,
+                                                    style: TextStyle(
+                                                      fontSize: 12.sp,
+                                                      color:
+                                                          Colors.grey.shade600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+
+                                        // Delete button
+                                        Container(
+                                          width: 36.w,
+                                          height: 36.w,
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.shade50,
+                                            borderRadius: BorderRadius.circular(
+                                              8.r,
+                                            ),
+                                          ),
+                                          child: Material(
+                                            color: Colors.transparent,
+                                            child: InkWell(
+                                              onTap: () =>
+                                                  _deleteContact(contact.id),
+                                              borderRadius:
+                                                  BorderRadius.circular(8.r),
+                                              child: Icon(
+                                                Icons.delete_outline,
+                                                size: 18.sp,
+                                                color: Colors.red.shade600,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -1065,36 +2733,266 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Future<void> _showContactDetailDialog(LienHe contact) async {
+    final date = UIHelpers.formatDateVN(contact.ngayGui);
+    final userName = contact.taiKhoan?.fullName.isNotEmpty == true
+        ? contact.taiKhoan!.fullName
+        : (contact.taiKhoan?.userName ?? contact.taiKhoanId);
+
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(contact.tieuDe),
-        content: SingleChildScrollView(
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.r),
+        ),
+        child: Container(
+          constraints: BoxConstraints(maxWidth: 500.w),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Người gửi: ${contact.taiKhoan?.fullName.isNotEmpty == true ? contact.taiKhoan!.fullName : (contact.taiKhoan?.userName ?? contact.taiKhoanId)}',
+              // Header với gradient
+              Container(
+                padding: EdgeInsets.all(20.w),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Theme.of(context).colorScheme.primary,
+                      Theme.of(context).colorScheme.secondary,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(16.r),
+                    topRight: Radius.circular(16.r),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.email_outlined,
+                      color: Colors.white,
+                      size: 24.sp,
+                    ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: Text(
+                        contact.tieuDe,
+                        style: TextStyle(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      icon: Icon(Icons.close, color: Colors.white, size: 20.sp),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 6),
-              SelectableText('Email: ${contact.taiKhoan?.email ?? 'N/A'}'),
-              const Divider(height: 20),
-              Text(
-                'Nội dung:',
-                style: Theme.of(dialogContext).textTheme.titleSmall,
+
+              // Content
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.all(20.w),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Info cards
+                      Container(
+                        padding: EdgeInsets.all(12.w),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(10.r),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.person_outline,
+                              size: 18.sp,
+                              color: Colors.blue.shade700,
+                            ),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Người gửi',
+                                    style: TextStyle(
+                                      fontSize: 11.sp,
+                                      color: Colors.blue.shade700,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2.h),
+                                  Text(
+                                    userName,
+                                    style: TextStyle(
+                                      fontSize: 13.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.blue.shade900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 12.h),
+
+                      Container(
+                        padding: EdgeInsets.all(12.w),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(10.r),
+                          border: Border.all(color: Colors.green.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.email_outlined,
+                              size: 18.sp,
+                              color: Colors.green.shade700,
+                            ),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Email',
+                                    style: TextStyle(
+                                      fontSize: 11.sp,
+                                      color: Colors.green.shade700,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2.h),
+                                  SelectableText(
+                                    contact.taiKhoan?.email ?? 'Chưa có email',
+                                    style: TextStyle(
+                                      fontSize: 13.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.green.shade900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 12.h),
+
+                      Container(
+                        padding: EdgeInsets.all(12.w),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(10.r),
+                          border: Border.all(color: Colors.orange.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today_outlined,
+                              size: 18.sp,
+                              color: Colors.orange.shade700,
+                            ),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Ngày gửi',
+                                    style: TextStyle(
+                                      fontSize: 11.sp,
+                                      color: Colors.orange.shade700,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2.h),
+                                  Text(
+                                    date,
+                                    style: TextStyle(
+                                      fontSize: 13.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.orange.shade900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      SizedBox(height: 20.h),
+                      Divider(color: Colors.grey.shade300),
+                      SizedBox(height: 16.h),
+
+                      // Content section
+                      Text(
+                        'Nội dung',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade800,
+                        ),
+                      ),
+                      SizedBox(height: 12.h),
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(16.w),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(10.r),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: SelectableText(
+                          contact.noiDung,
+                          style: TextStyle(
+                            fontSize: 13.sp,
+                            height: 1.6,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 6),
-              Text(contact.noiDung),
+
+              // Actions
+              Container(
+                padding: EdgeInsets.all(16.w),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(16.r),
+                    bottomRight: Radius.circular(16.r),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: Text('Đóng', style: TextStyle(fontSize: 13.sp)),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Đóng'),
-          ),
-        ],
       ),
     );
   }

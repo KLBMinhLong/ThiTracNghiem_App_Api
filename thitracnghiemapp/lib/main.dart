@@ -90,6 +90,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'Thi Trắc Nghiệm App',
+        debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true, // Giao diện Material 3 đẹp
           primarySwatch: Colors.blue,

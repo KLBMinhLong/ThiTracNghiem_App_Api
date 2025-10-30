@@ -313,132 +313,18 @@ class _HomeScreenState extends State<HomeScreen> {
     if (user == null) {
       return;
     }
-    final formKey = GlobalKey<FormState>();
-    final fullNameController = TextEditingController(text: user.fullName);
-    final emailController = TextEditingController(text: user.email);
-    final phoneController = TextEditingController(text: user.phoneNumber ?? '');
-    DateTime? birthday = user.birthday;
-    final genderController = TextEditingController(text: user.gender ?? '');
 
     final success = await showModalBottomSheet<bool>(
       context: rootContext,
       isScrollControlled: true,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (modalContext, setModalState) => Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(modalContext).viewInsets.bottom,
-              left: 16,
-              right: 16,
-              top: 24,
-            ),
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: fullNameController,
-                    decoration: const InputDecoration(labelText: 'Họ và tên'),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? 'Vui lòng nhập họ tên'
-                        : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: emailController,
-                    decoration: const InputDecoration(labelText: 'Email'),
-                    validator: (value) => value == null || !value.contains('@')
-                        ? 'Email không hợp lệ'
-                        : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: phoneController,
-                    decoration: const InputDecoration(
-                      labelText: 'Số điện thoại',
-                    ),
-                    keyboardType: TextInputType.phone,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          birthday == null
-                              ? 'Ngày sinh: chưa cập nhật'
-                              : 'Ngày sinh: ${MaterialLocalizations.of(modalContext).formatFullDate(birthday!)}',
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () async {
-                          final picked = await showDatePicker(
-                            context: modalContext,
-                            initialDate: birthday ?? DateTime.now(),
-                            firstDate: DateTime(1950),
-                            lastDate: DateTime.now(),
-                          );
-                          if (picked != null) {
-                            setModalState(() {
-                              birthday = picked;
-                            });
-                          }
-                        },
-                        child: const Text('Chọn ngày'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: genderController,
-                    decoration: const InputDecoration(labelText: 'Giới tính'),
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: () async {
-                      if (!formKey.currentState!.validate()) {
-                        return;
-                      }
-                      FocusScope.of(modalContext).unfocus();
-                      await auth.updateProfile(
-                        fullName: fullNameController.text.trim(),
-                        email: emailController.text.trim(),
-                        soDienThoai: phoneController.text.trim().isEmpty
-                            ? null
-                            : phoneController.text.trim(),
-                        ngaySinh: birthday,
-                        gioiTinh: genderController.text.trim().isEmpty
-                            ? null
-                            : genderController.text.trim(),
-                      );
-                      if (!mounted) {
-                        return;
-                      }
-                      if (auth.error != null) {
-                        ScaffoldMessenger.of(
-                          rootContext,
-                        ).showSnackBar(SnackBar(content: Text(auth.error!)));
-                        return;
-                      }
-                      Navigator.of(modalContext).pop(true);
-                    },
-                    child: const Text('Lưu thay đổi'),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+      builder: (_) => _EditProfileSheet(
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phoneNumber,
+        birthday: user.birthday,
+        gender: user.gender,
+      ),
     );
-
-    _disposeTextControllers([
-      fullNameController,
-      emailController,
-      phoneController,
-      genderController,
-    ]);
 
     if (success == true && mounted) {
       ScaffoldMessenger.of(rootContext).showSnackBar(
@@ -1044,6 +930,156 @@ class _ProfileTab extends StatelessWidget {
 }
 
 // _ResultDetailSheet: màn cũ đã được thay bằng ResultReviewScreen
+
+class _EditProfileSheet extends StatefulWidget {
+  final String fullName;
+  final String email;
+  final String? phone;
+  final DateTime? birthday;
+  final String? gender;
+
+  const _EditProfileSheet({
+    required this.fullName,
+    required this.email,
+    this.phone,
+    this.birthday,
+    this.gender,
+  });
+
+  @override
+  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends State<_EditProfileSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _fullNameController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _phoneController;
+  late final TextEditingController _genderController;
+  DateTime? _birthday;
+
+  @override
+  void initState() {
+    super.initState();
+    _fullNameController = TextEditingController(text: widget.fullName);
+    _emailController = TextEditingController(text: widget.email);
+    _phoneController = TextEditingController(text: widget.phone ?? '');
+    _genderController = TextEditingController(text: widget.gender ?? '');
+    _birthday = widget.birthday;
+  }
+
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _genderController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _fullNameController,
+                  decoration: const InputDecoration(labelText: 'Họ và tên'),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Vui lòng nhập họ tên'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(labelText: 'Email'),
+                  validator: (value) => value == null || !value.contains('@')
+                      ? 'Email không hợp lệ'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _phoneController,
+                  decoration: const InputDecoration(labelText: 'Số điện thoại'),
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _birthday == null
+                            ? 'Ngày sinh: chưa cập nhật'
+                            : 'Ngày sinh: ${MaterialLocalizations.of(context).formatFullDate(_birthday!)}',
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _birthday ?? DateTime.now(),
+                          firstDate: DateTime(1950),
+                          lastDate: DateTime.now(),
+                        );
+                        if (picked != null) {
+                          setState(() => _birthday = picked);
+                        }
+                      },
+                      child: const Text('Chọn ngày'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _genderController,
+                  decoration: const InputDecoration(labelText: 'Giới tính'),
+                ),
+                const SizedBox(height: 24),
+                FilledButton(
+                  onPressed: () async {
+                    if (!_formKey.currentState!.validate()) return;
+                    FocusScope.of(context).unfocus();
+                    final auth = context.read<AuthProvider>();
+                    await auth.updateProfile(
+                      fullName: _fullNameController.text.trim(),
+                      email: _emailController.text.trim(),
+                      soDienThoai: _phoneController.text.trim().isEmpty
+                          ? null
+                          : _phoneController.text.trim(),
+                      ngaySinh: _birthday,
+                      gioiTinh: _genderController.text.trim().isEmpty
+                          ? null
+                          : _genderController.text.trim(),
+                    );
+                    if (!mounted) return;
+                    if (auth.error != null) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(auth.error!)));
+                      return;
+                    }
+                    Navigator.of(context).pop(true);
+                  },
+                  child: const Text('Lưu thay đổi'),
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _TwoFaTile extends StatefulWidget {
   @override

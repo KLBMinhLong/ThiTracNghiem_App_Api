@@ -22,6 +22,25 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _obscure = true;
 
+  String _friendlyAuthError(String raw) {
+    final lower = raw.toLowerCase();
+    if (lower.contains('invalid') ||
+        lower.contains('unauthorized') ||
+        lower.contains('không hợp lệ')) {
+      return 'Sai tên đăng nhập hoặc mật khẩu. Vui lòng thử lại.';
+    }
+    if (lower.contains('locked')) {
+      return 'Tài khoản tạm thời bị khóa. Vui lòng thử lại sau.';
+    }
+    if (lower.contains('not found') || lower.contains('không tìm thấy')) {
+      return 'Tài khoản không tồn tại.';
+    }
+    if (lower.contains('network') || lower.contains('timeout')) {
+      return 'Không thể kết nối máy chủ. Vui lòng kiểm tra internet và thử lại.';
+    }
+    return raw;
+  }
+
   @override
   void dispose() {
     _identifierController.dispose();
@@ -71,9 +90,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     obscureText: _obscure,
                     textInputAction: TextInputAction.done,
                     onFieldSubmitted: (_) => _login(auth),
-                    validator: (value) => value == null || value.isEmpty
-                        ? 'Vui lòng nhập mật khẩu'
-                        : null,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Vui lòng nhập mật khẩu';
+                      }
+                      if (value.length < 6) {
+                        return 'Mật khẩu tối thiểu 6 ký tự';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 24),
                   SizedBox(
@@ -105,7 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   if (auth.error != null) ...[
                     const SizedBox(height: 12),
                     Text(
-                      auth.error!,
+                      _friendlyAuthError(auth.error!),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.error,
                       ),
@@ -219,10 +244,15 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.of(context).pushReplacementNamed('/login-2fa');
       return;
     }
-    if (auth.error != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(auth.error!)));
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _friendlyAuthError(
+            auth.error ??
+                'Đăng nhập không thành công. Vui lòng kiểm tra thông tin.',
+          ),
+        ),
+      ),
+    );
   }
 }

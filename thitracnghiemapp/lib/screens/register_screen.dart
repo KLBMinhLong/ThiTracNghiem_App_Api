@@ -21,6 +21,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
 
+  String _friendlyAuthError(String raw) {
+    final lower = raw.toLowerCase();
+    if (lower.contains('email') &&
+        (lower.contains('exists') ||
+            lower.contains('đã tồn tại') ||
+            lower.contains('already'))) {
+      return 'Email đã được sử dụng. Vui lòng chọn email khác.';
+    }
+    if (lower.contains('username') &&
+        (lower.contains('exists') ||
+            lower.contains('đã tồn tại') ||
+            lower.contains('already'))) {
+      return 'Tên đăng nhập đã được sử dụng. Vui lòng chọn tên khác.';
+    }
+    if (lower.contains('weak') ||
+        lower.contains('mật khẩu') && lower.contains('yếu')) {
+      return 'Mật khẩu quá yếu. Vui lòng chọn mật khẩu mạnh hơn.';
+    }
+    if (lower.contains('network') || lower.contains('timeout')) {
+      return 'Không thể kết nối máy chủ. Vui lòng kiểm tra internet và thử lại.';
+    }
+    return raw;
+  }
+
   @override
   void dispose() {
     _usernameController.dispose();
@@ -52,10 +76,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelText: 'Tên đăng nhập',
                         prefixIcon: Icon(Icons.person_outline),
                       ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                          ? 'Vui lòng nhập tên đăng nhập'
-                          : null,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Vui lòng nhập tên đăng nhập';
+                        }
+                        if (value.trim().length < 3) {
+                          return 'Tên đăng nhập tối thiểu 3 ký tự';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -64,10 +93,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelText: 'Họ và tên',
                         prefixIcon: Icon(Icons.badge_outlined),
                       ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                          ? 'Vui lòng nhập họ tên'
-                          : null,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Vui lòng nhập họ tên';
+                        }
+                        if (value.trim().length < 2) {
+                          return 'Họ tên tối thiểu 2 ký tự';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -108,9 +142,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                         ),
                       ),
-                      validator: (value) => value == null || value.length < 6
-                          ? 'Mật khẩu tối thiểu 6 ký tự'
-                          : null,
+                      validator: (value) {
+                        if (value == null || value.length < 6) {
+                          return 'Mật khẩu tối thiểu 6 ký tự';
+                        }
+                        final hasLetter = RegExp(r'[A-Za-z]').hasMatch(value);
+                        final hasDigit = RegExp(r'\d').hasMatch(value);
+                        if (!(hasLetter && hasDigit)) {
+                          return 'Mật khẩu nên gồm cả chữ và số';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -153,6 +195,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             : const Text('Đăng ký'),
                       ),
                     ),
+                    if (auth.error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _friendlyAuthError(auth.error!),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -178,10 +230,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         const SnackBar(content: Text('Đăng ký thành công, hãy đăng nhập.')),
       );
       Navigator.of(context).pop();
-    } else if (!success && mounted && auth.error != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(auth.error!)));
+    } else if (!success && mounted) {
+      final msg = _friendlyAuthError(
+        auth.error ?? 'Đăng ký không thành công. Vui lòng kiểm tra thông tin.',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 }

@@ -25,11 +25,16 @@ class _TwoFaLoginScreenState extends State<TwoFaLoginScreen> {
     final auth = context.watch<AuthProvider>();
     return Scaffold(
       appBar: AppBar(title: const Text('Xác thực 2 bước')),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
             child: Form(
               key: _formKey,
               child: Column(

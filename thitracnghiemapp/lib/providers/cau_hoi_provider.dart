@@ -28,6 +28,7 @@ class CauHoiProvider extends ChangeNotifier {
   String? get error => _error;
 
   Future<void> refreshCauHois({int? topicId}) async {
+    // If a topicId is explicitly provided, use it; otherwise use current filter
     final effectiveTopicId = topicId ?? _selectedTopicId;
     if (_loading && effectiveTopicId == _selectedTopicId) {
       return;
@@ -84,10 +85,12 @@ class CauHoiProvider extends ChangeNotifier {
   }
 
   Future<void> setTopicFilter(int? topicId) async {
+    // Update the selected topic first so passing null clears the filter properly
     if (_selectedTopicId == topicId && _cauHois.isNotEmpty) {
       return;
     }
-    await refreshCauHois(topicId: topicId);
+    _selectedTopicId = topicId; // allow null to mean "all topics"
+    await refreshCauHois();
   }
 
   Future<CauHoi?> createCauHoi({

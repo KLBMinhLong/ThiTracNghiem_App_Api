@@ -24,11 +24,15 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final TextEditingController _userKeywordController = TextEditingController();
+  final TextEditingController _topicSearchController = TextEditingController();
+  final TextEditingController _examKeywordController = TextEditingController();
   int _selectedIndex = 0;
   int _userPage = 1;
   int _examPage = 1;
   bool _isImportingQuestions = false;
   int? _selectedTopicForImport;
+  int? _examTopicFilterId;
+  String? _examStatusFilter; // 'Mo', 'Dong', or null for all
 
   @override
   void initState() {
@@ -39,6 +43,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   void dispose() {
     _userKeywordController.dispose();
+    _topicSearchController.dispose();
+    _examKeywordController.dispose();
     super.dispose();
   }
 
@@ -309,11 +315,46 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Consumer<ChuDeProvider>(
       builder: (context, provider, _) {
         final topics = provider.chuDes;
+        final keyword = _topicSearchController.text.trim().toLowerCase();
+        final filteredTopics = keyword.isEmpty
+            ? topics
+            : topics
+                  .where(
+                    (t) =>
+                        t.tenChuDe.toLowerCase().contains(keyword) ||
+                        (t.moTa ?? '').toLowerCase().contains(keyword),
+                  )
+                  .toList(growable: false);
         return Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _topicSearchController,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search),
+                        hintText: 'Tìm kiếm chủ đề theo tên hoặc mô tả',
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  IconButton(
+                    tooltip: 'Xoá tìm kiếm',
+                    onPressed: () {
+                      if (_topicSearchController.text.isEmpty) return;
+                      _topicSearchController.clear();
+                      setState(() {});
+                    },
+                    icon: const Icon(Icons.clear),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerRight,
                 child: FilledButton.icon(
@@ -327,10 +368,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 child: provider.isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : ListView.separated(
-                        itemCount: topics.length,
+                        itemCount: filteredTopics.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
-                          final topic = topics[index];
+                          final topic = filteredTopics[index];
                           return Card(
                             child: ListTile(
                               title: Text(topic.tenChuDe),
@@ -620,6 +661,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         final topicMap = {
           for (final topic in topicProvider.chuDes) topic.id: topic.tenChuDe,
         };
+        final examKeyword = _examKeywordController.text.trim().toLowerCase();
+        final filteredExams = exams
+            .where((e) {
+              final byKeyword = examKeyword.isEmpty
+                  ? true
+                  : e.tenDeThi.toLowerCase().contains(examKeyword);
+              final byTopic = _examTopicFilterId == null
+                  ? true
+                  : e.chuDeId == _examTopicFilterId;
+              final byStatus = _examStatusFilter == null
+                  ? true
+                  : (e.trangThai == _examStatusFilter);
+              return byKeyword && byTopic && byStatus;
+            })
+            .toList(growable: false);
 
         return Padding(
           padding: const EdgeInsets.all(16),
@@ -627,10 +683,106 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             children: [
               Align(
                 alignment: Alignment.centerRight,
-                child: FilledButton.icon(
-                  onPressed: () => _showExamDialog(),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Thêm đề thi'),
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    SizedBox(
+                      width: 260,
+                      child: TextField(
+                        controller: _examKeywordController,
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.search),
+                          hintText: 'Tìm kiếm đề thi theo tên',
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 220,
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Lọc theo chủ đề',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<int?>(
+                            value: _examTopicFilterId,
+                            isExpanded: true,
+                            items: [
+                              const DropdownMenuItem<int?>(
+                                value: null,
+                                child: Text('Tất cả chủ đề'),
+                              ),
+                              for (final topic in topicProvider.chuDes)
+                                DropdownMenuItem<int?>(
+                                  value: topic.id,
+                                  child: Text(topic.tenChuDe),
+                                ),
+                            ],
+                            onChanged: (value) =>
+                                setState(() => _examTopicFilterId = value),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 180,
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'Trạng thái',
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String?>(
+                            value: _examStatusFilter,
+                            isExpanded: true,
+                            items: const [
+                              DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('Tất cả trạng thái'),
+                              ),
+                              DropdownMenuItem<String?>(
+                                value: 'Mo',
+                                child: Text('Mở'),
+                              ),
+                              DropdownMenuItem<String?>(
+                                value: 'Dong',
+                                child: Text('Đóng'),
+                              ),
+                            ],
+                            onChanged: (value) =>
+                                setState(() => _examStatusFilter = value),
+                          ),
+                        ),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        _examKeywordController.clear();
+                        _examTopicFilterId = null;
+                        _examStatusFilter = null;
+                        setState(() {});
+                      },
+                      icon: const Icon(Icons.filter_alt_off_outlined),
+                      label: const Text('Xoá lọc'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () => _showExamDialog(),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Thêm đề thi'),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 16),
@@ -638,10 +790,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 child: examProvider.loadingAdmin
                     ? const Center(child: CircularProgressIndicator())
                     : ListView.separated(
-                        itemCount: exams.length,
+                        itemCount: filteredExams.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
-                          final exam = exams[index];
+                          final exam = filteredExams[index];
                           final topicName =
                               topicMap[exam.chuDeId] ??
                               'Chủ đề ${exam.chuDeId}';
@@ -1336,77 +1488,82 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           title: Text(exam == null ? 'Thêm đề thi' : 'Cập nhật đề thi'),
           content: Form(
             key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<int>(
-                  value: selectedTopicId,
-                  items: [
-                    for (final topic in topics)
-                      DropdownMenuItem(
-                        value: topic.id,
-                        child: Text(topic.tenChuDe),
-                      ),
-                  ],
-                  onChanged: (value) => setState(
-                    () => selectedTopicId = value ?? selectedTopicId,
+            child: SingleChildScrollView(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(dialogContext).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<int>(
+                    value: selectedTopicId,
+                    items: [
+                      for (final topic in topics)
+                        DropdownMenuItem(
+                          value: topic.id,
+                          child: Text(topic.tenChuDe),
+                        ),
+                    ],
+                    onChanged: (value) => setState(
+                      () => selectedTopicId = value ?? selectedTopicId,
+                    ),
+                    decoration: const InputDecoration(labelText: 'Chủ đề'),
                   ),
-                  decoration: const InputDecoration(labelText: 'Chủ đề'),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Tên đề thi'),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Nhập tên đề thi'
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: questionCountController,
-                  decoration: const InputDecoration(labelText: 'Số câu hỏi'),
-                  keyboardType: TextInputType.number,
-                  validator: (value) => int.tryParse(value ?? '') == null
-                      ? 'Nhập số câu hỏi hợp lệ'
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: durationController,
-                  decoration: const InputDecoration(
-                    labelText: 'Thời gian thi (phút)',
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: nameController,
+                    decoration: const InputDecoration(labelText: 'Tên đề thi'),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Nhập tên đề thi'
+                        : null,
                   ),
-                  keyboardType: TextInputType.number,
-                  validator: (value) => int.tryParse(value ?? '') == null
-                      ? 'Nhập thời gian hợp lệ'
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: status,
-                  decoration: const InputDecoration(labelText: 'Trạng thái'),
-                  items: const [
-                    DropdownMenuItem(value: 'Mo', child: Text('Mở')),
-                    DropdownMenuItem(value: 'Dong', child: Text('Đóng')),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => status = value ?? status),
-                ),
-                const SizedBox(height: 12),
-                CheckboxListTile(
-                  value: allowMultipleAttempts,
-                  onChanged: (value) => setState(
-                    () =>
-                        allowMultipleAttempts = value ?? allowMultipleAttempts,
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: questionCountController,
+                    decoration: const InputDecoration(labelText: 'Số câu hỏi'),
+                    keyboardType: TextInputType.number,
+                    validator: (value) => int.tryParse(value ?? '') == null
+                        ? 'Nhập số câu hỏi hợp lệ'
+                        : null,
                   ),
-                  controlAffinity: ListTileControlAffinity.leading,
-                  title: const Text('Cho phép thí sinh thi nhiều lần'),
-                  subtitle: const Text(
-                    'Nếu tắt, mỗi tài khoản chỉ được thi và nộp bài một lần.',
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: durationController,
+                    decoration: const InputDecoration(
+                      labelText: 'Thời gian thi (phút)',
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (value) => int.tryParse(value ?? '') == null
+                        ? 'Nhập thời gian hợp lệ'
+                        : null,
                   ),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: status,
+                    decoration: const InputDecoration(labelText: 'Trạng thái'),
+                    items: const [
+                      DropdownMenuItem(value: 'Mo', child: Text('Mở')),
+                      DropdownMenuItem(value: 'Dong', child: Text('Đóng')),
+                    ],
+                    onChanged: (value) =>
+                        setState(() => status = value ?? status),
+                  ),
+                  const SizedBox(height: 12),
+                  CheckboxListTile(
+                    value: allowMultipleAttempts,
+                    onChanged: (value) => setState(
+                      () => allowMultipleAttempts =
+                          value ?? allowMultipleAttempts,
+                    ),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: const Text('Cho phép thí sinh thi nhiều lần'),
+                    subtitle: const Text(
+                      'Nếu tắt, mỗi tài khoản chỉ được thi và nộp bài một lần.',
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [

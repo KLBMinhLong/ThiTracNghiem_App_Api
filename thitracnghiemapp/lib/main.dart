@@ -91,6 +91,14 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Thi Trắc Nghiệm App',
         debugShowCheckedModeBanner: false,
+        builder: (context, child) {
+          // Dismiss keyboard when tapping outside and ensure consistent scroll behavior
+          return GestureDetector(
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            behavior: HitTestBehavior.translucent,
+            child: child ?? const SizedBox.shrink(),
+          );
+        },
         theme: ThemeData(
           useMaterial3: true, // Giao diện Material 3 đẹp
           primarySwatch: Colors.blue,

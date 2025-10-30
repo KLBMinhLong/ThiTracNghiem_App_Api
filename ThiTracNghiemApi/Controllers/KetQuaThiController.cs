@@ -33,6 +33,7 @@ public class KetQuaThiController : ControllerBase
         var query = _context.KetQuaThis
             .AsNoTracking()
             .Include(k => k.DeThi)
+                .ThenInclude(d => d!.ChuDe)
             .Include(k => k.TaiKhoan)
             .OrderByDescending(k => k.NgayThi)
             .AsQueryable();
@@ -54,7 +55,18 @@ public class KetQuaThiController : ControllerBase
                 k.TrangThai,
                 k.NgayThi,
                 k.NgayNopBai,
-                DeThi = k.DeThi == null ? null : new { k.DeThi.Id, k.DeThi.TenDeThi, k.DeThi.ThoiGianThi },
+                DeThi = k.DeThi == null
+                    ? null
+                    : new
+                    {
+                        k.DeThi.Id,
+                        k.DeThi.TenDeThi,
+                        k.DeThi.ThoiGianThi,
+                        k.DeThi.ChuDeId,
+                        ChuDe = k.DeThi.ChuDe == null
+                            ? null
+                            : new { k.DeThi.ChuDe.Id, k.DeThi.ChuDe.TenChuDe }
+                    },
                 TaiKhoan = isAdmin && k.TaiKhoan != null
                     ? new { k.TaiKhoan.Id, k.TaiKhoan.FullName, k.TaiKhoan.UserName }
                     : null
@@ -147,6 +159,11 @@ public class KetQuaThiController : ControllerBase
         {
             return Forbid();
         }
+
+        // Xoá chi tiết trước để tránh lỗi ràng buộc khoá ngoại khi cấu hình OnDelete = NoAction
+        await _context.ChiTietKetQuaThis
+            .Where(ct => ct.KetQuaThiId == id)
+            .ExecuteDeleteAsync();
 
         _context.KetQuaThis.Remove(ketQua);
         await _context.SaveChangesAsync();

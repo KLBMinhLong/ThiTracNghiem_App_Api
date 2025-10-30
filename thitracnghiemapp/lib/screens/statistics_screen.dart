@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../models/ket_qua_thi.dart';
 import '../providers/auth_provider.dart';
 import '../providers/ket_qua_thi_provider.dart';
+import '../providers/chu_de_provider.dart';
 
 class StatisticsScreen extends StatefulWidget {
   const StatisticsScreen({super.key});
@@ -30,9 +31,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   Future<void> _load() async {
     final auth = context.read<AuthProvider>();
     final userId = auth.currentUser?.id;
-    await context.read<KetQuaThiProvider>().fetchKetQuaThiList(
-      onlyUserId: userId,
-    );
+    await Future.wait([
+      context.read<KetQuaThiProvider>().fetchKetQuaThiList(onlyUserId: userId),
+      context.read<ChuDeProvider>().fetchChuDes(),
+    ]);
   }
 
   @override
@@ -194,9 +196,21 @@ class _AverageByTopicCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final chuDes = context.watch<ChuDeProvider>().chuDes;
+    String topicNameFor(KetQuaThiSummary e) {
+      final nested = e.deThi?.chuDe?.tenChuDe;
+      if (nested != null && nested.isNotEmpty) return nested;
+      final id = e.deThi?.chuDeId;
+      if (id != null && id != 0) {
+        final found = chuDes.where((c) => c.id == id).toList(growable: false);
+        if (found.isNotEmpty) return found.first.tenChuDe;
+      }
+      return 'Khác';
+    }
+
     final byTopic = <String, List<double>>{};
     for (final e in items) {
-      final topic = e.deThi?.chuDe?.tenChuDe ?? 'Khác';
+      final topic = topicNameFor(e);
       final score = e.diem;
       if (score == null) continue;
       byTopic.putIfAbsent(topic, () => <double>[]).add(score);

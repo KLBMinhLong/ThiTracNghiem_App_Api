@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/binh_luan.dart';
 import '../models/de_thi.dart';
+import '../providers/auth_provider.dart';
 import '../providers/binh_luan_provider.dart';
 import '../providers/de_thi_provider.dart';
 import '../providers/chu_de_provider.dart';
@@ -169,6 +170,10 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                   itemBuilder: (context, index) {
                     final comment = comments[index];
                     final author = comment.taiKhoan;
+                    final authUser = context.read<AuthProvider>().currentUser;
+                    final isOwner =
+                        (comment.taiKhoan?.id ?? comment.taiKhoanId) ==
+                        authUser?.id;
                     return ListTile(
                       tileColor: Theme.of(context).colorScheme.surfaceVariant,
                       shape: RoundedRectangleBorder(
@@ -178,10 +183,43 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
                         author?.fullName ?? author?.userName ?? 'Ẩn danh',
                       ),
                       subtitle: Text(comment.noiDung),
-                      trailing: Text(
-                        MaterialLocalizations.of(
-                          context,
-                        ).formatShortDate(comment.ngayTao.toLocal()),
+                      trailing: Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 4,
+                        children: [
+                          Text(
+                            MaterialLocalizations.of(
+                              context,
+                            ).formatShortDate(comment.ngayTao.toLocal()),
+                          ),
+                          if (isOwner)
+                            PopupMenuButton<String>(
+                              tooltip: 'Tuỳ chọn',
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  _showEditComment(comment);
+                                } else if (value == 'delete') {
+                                  _confirmDeleteComment(comment);
+                                }
+                              },
+                              itemBuilder: (context) => const [
+                                PopupMenuItem(
+                                  value: 'edit',
+                                  child: ListTile(
+                                    leading: Icon(Icons.edit_outlined),
+                                    title: Text('Sửa'),
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  child: ListTile(
+                                    leading: Icon(Icons.delete_outline),
+                                    title: Text('Xoá'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
                       ),
                     );
                   },
@@ -256,6 +294,15 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
   Future<void> _submitComment() async {
     final content = _commentController.text.trim();
     if (content.isEmpty) {
+      _showToast('Vui lòng nhập nội dung bình luận');
+      return;
+    }
+    if (content.length < 5) {
+      _showToast('Nội dung bình luận tối thiểu 5 ký tự');
+      return;
+    }
+    if (content.length > 500) {
+      _showToast('Nội dung bình luận tối đa 500 ký tự');
       return;
     }
     setState(() => _sendingComment = true);
@@ -267,7 +314,10 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
         if (!mounted) {
           return;
         }
-        _showToast(error);
+        final friendly = error.toLowerCase().contains('validation')
+            ? 'Nội dung bình luận không hợp lệ. (tối thiểu 5, tối đa 500 ký tự)'
+            : error;
+        _showToast(friendly);
         return;
       }
       await _loadComments();
@@ -281,6 +331,103 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
         setState(() => _sendingComment = false);
       }
     }
+  }
+
+  Future<void> _showEditComment(BinhLuan comment) async {
+    final provider = context.read<BinhLuanProvider>();
+    final formKey = GlobalKey<FormState>();
+    final controller = TextEditingController(text: comment.noiDung);
+
+    final updatedText = await showModalBottomSheet<String?>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final viewInsets = MediaQuery.of(sheetContext).viewInsets;
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: viewInsets.bottom + 24,
+              left: 16,
+              right: 16,
+              top: 24,
+            ),
+            child: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: controller,
+                      decoration: const InputDecoration(
+                        labelText: 'Chỉnh sửa bình luận',
+                      ),
+                      minLines: 2,
+                      maxLines: 6,
+                      validator: (value) {
+                        final text = value?.trim() ?? '';
+                        if (text.isEmpty) return 'Vui lòng nhập nội dung';
+                        if (text.length < 5) return 'Tối thiểu 5 ký tự';
+                        if (text.length > 500) return 'Tối đa 500 ký tự';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () {
+                        if (!formKey.currentState!.validate()) return;
+                        FocusScope.of(sheetContext).unfocus();
+                        if (!sheetContext.mounted) return;
+                        Navigator.of(sheetContext).pop(controller.text.trim());
+                      },
+                      child: const Text('Lưu'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (updatedText == null) return;
+    await provider.updateComment(id: comment.id, noiDung: updatedText);
+    final error = provider.error;
+    if (error != null) {
+      _showToast(error);
+      return;
+    }
+    _showToast('Đã cập nhật bình luận');
+  }
+
+  Future<void> _confirmDeleteComment(BinhLuan comment) async {
+    final provider = context.read<BinhLuanProvider>();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Xoá bình luận'),
+        content: const Text('Bạn có chắc muốn xoá bình luận này?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Huỷ'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Xoá'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    await provider.deleteComment(comment.id);
+    final error = provider.error;
+    if (error != null) {
+      _showToast(error);
+      return;
+    }
+    _showToast('Đã xoá bình luận');
   }
 
   void _showToast(String message) {

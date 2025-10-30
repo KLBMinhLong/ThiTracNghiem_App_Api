@@ -224,6 +224,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ),
                   const SizedBox(width: 12),
                   FilledButton.icon(
+                    onPressed: () => _showCreateUserDialog(),
+                    icon: const Icon(Icons.person_add_alt_1),
+                    label: const Text('Thêm người dùng'),
+                  ),
+                  const SizedBox(width: 12),
+                  FilledButton.icon(
                     onPressed: _searchUsers,
                     icon: const Icon(Icons.refresh),
                     label: const Text('Tải lại'),
@@ -263,9 +269,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                 Text(user.isLocked ? 'Đã khoá' : 'Hoạt động'),
                               ],
                             ),
-                            trailing: IconButton(
-                              icon: const Icon(Icons.edit_outlined),
-                              onPressed: () => _showUserDialog(user),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined),
+                                  onPressed: () => _showUserDialog(user),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline),
+                                  onPressed: () => _deleteUser(user),
+                                ),
+                              ],
                             ),
                           ),
                         );
@@ -309,6 +324,154 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         );
       },
     );
+  }
+
+  Future<void> _showCreateUserDialog() async {
+    final rootContext = context;
+    final usersProvider = rootContext.read<UsersProvider>();
+    final formKey = GlobalKey<FormState>();
+    final userNameController = TextEditingController();
+    final emailController = TextEditingController();
+    final fullNameController = TextEditingController();
+    final passwordController = TextEditingController();
+    bool isAdmin = false;
+
+    final confirm = await showDialog<bool>(
+      context: rootContext,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setState) => AlertDialog(
+          title: const Text('Thêm người dùng'),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: userNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Tên đăng nhập',
+                    ),
+                    validator: (v) => v == null || v.trim().length < 3
+                        ? 'Nhập tên đăng nhập (>= 3 ký tự)'
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: emailController,
+                    decoration: const InputDecoration(
+                      labelText: 'Email (tuỳ chọn)',
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: fullNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Họ và tên (tuỳ chọn)',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: passwordController,
+                    decoration: const InputDecoration(labelText: 'Mật khẩu'),
+                    obscureText: true,
+                    validator: (v) => v == null || v.trim().length < 6
+                        ? 'Mật khẩu tối thiểu 6 ký tự'
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  CheckboxListTile(
+                    value: isAdmin,
+                    onChanged: (val) => setState(() => isAdmin = val ?? false),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: const Text('Cấp quyền quản trị (Admin)'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Huỷ'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                FocusScope.of(dialogContext).unfocus();
+                if (!dialogContext.mounted) return;
+                Navigator.of(dialogContext).pop(true);
+              },
+              child: const Text('Tạo'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final created = await usersProvider.createUser(
+      userName: userNameController.text.trim(),
+      email: emailController.text.trim().isEmpty
+          ? null
+          : emailController.text.trim(),
+      fullName: fullNameController.text.trim().isEmpty
+          ? null
+          : fullNameController.text.trim(),
+      password: passwordController.text,
+      roles: isAdmin ? ['Admin'] : ['User'],
+    );
+    if (!mounted) return;
+    if (created != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Đã tạo người dùng')));
+      await _searchUsers();
+    } else {
+      final message = usersProvider.error ?? 'Không thể tạo người dùng.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  Future<void> _deleteUser(User user) async {
+    final usersProvider = context.read<UsersProvider>();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Xoá người dùng'),
+        content: Text('Bạn có chắc muốn xoá tài khoản ${user.userName}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Huỷ'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Xoá'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    final ok = await usersProvider.deleteUser(user.id);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Đã xoá người dùng')));
+      await _searchUsers();
+    } else {
+      final message = usersProvider.error ?? 'Không thể xoá người dùng.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 
   Widget _buildTopicsSection() {

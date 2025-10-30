@@ -68,4 +68,31 @@ class UsersService {
     }
     return User.fromJson(response);
   }
+
+  Future<User> createUser({
+    required String userName,
+    String? email,
+    String? fullName,
+    required String password,
+    List<String>? roles,
+  }) async {
+    final response = await _client.post(
+      '/api/Users',
+      body: {
+        'userName': userName,
+        'email': email,
+        'fullName': fullName,
+        'password': password,
+        if (roles != null) 'roles': roles,
+      },
+    );
+    if (response is! Map<String, dynamic>) {
+      throw const ApiException(message: 'Tạo người dùng thất bại');
+    }
+    return User.fromJson(response);
+  }
+
+  Future<void> deleteUser(String id) async {
+    await _client.delete('/api/Users/$id');
+  }
 }

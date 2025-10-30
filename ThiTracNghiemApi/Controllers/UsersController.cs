@@ -19,11 +19,13 @@ namespace ThiTracNghiemApi.Controllers
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly ApplicationDbContext _context;
 
-        public UsersController(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
+        public UsersController(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, ApplicationDbContext context)
         {
             _userManager = userManager;
             _roleManager = roleManager;
+            _context = context;
         }
 
         [HttpGet]
@@ -147,6 +149,101 @@ namespace ThiTracNghiemApi.Controllers
 
             var roles = await _userManager.GetRolesAsync(user);
             return Ok(user.ToDto(roles));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return ValidationProblem(ModelState);
+            }
+
+            var existingByName = await _userManager.FindByNameAsync(request.UserName);
+            if (existingByName != null)
+            {
+                return BadRequest($"Tên đăng nhập '{request.UserName}' đã tồn tại.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Email))
+            {
+                var existingByEmail = await _userManager.FindByEmailAsync(request.Email);
+                if (existingByEmail != null)
+                {
+                    return BadRequest($"Email '{request.Email}' đã được sử dụng.");
+                }
+            }
+
+            var user = new ApplicationUser
+            {
+                UserName = request.UserName.Trim(),
+                Email = request.Email?.Trim(),
+                FullName = request.FullName?.Trim() ?? string.Empty,
+                EmailConfirmed = true
+            };
+
+            var createResult = await _userManager.CreateAsync(user, request.Password);
+            if (!createResult.Succeeded)
+            {
+                return BadRequest(createResult.Errors);
+            }
+
+            var roles = (request.Roles ?? new List<string> { "User" })
+                .Where(r => !string.IsNullOrWhiteSpace(r))
+                .Select(r => r.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            foreach (var role in roles)
+            {
+                if (!await _roleManager.RoleExistsAsync(role))
+                {
+                    return BadRequest($"Role '{role}' không tồn tại.");
+                }
+            }
+
+            if (roles.Count > 0)
+            {
+                var addRoleResult = await _userManager.AddToRolesAsync(user, roles);
+                if (!addRoleResult.Succeeded)
+                {
+                    return BadRequest(addRoleResult.Errors);
+                }
+            }
+
+            var finalRoles = await _userManager.GetRolesAsync(user);
+            return CreatedAtAction(nameof(GetUser), new { id = user.Id }, user.ToDto(finalRoles));
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteUser(string id)
+        {
+            var user = await _userManager.Users.FirstOrDefaultAsync(u => u.Id == id);
+            if (user == null)
+            {
+                return NotFound();
+            }
+
+            // Không cho tự xoá nếu là admin duy nhất (tuỳ chọn). Bỏ qua để đơn giản.
+
+            // Nếu có lịch sử thi hoặc liên hệ -> không xoá, trả thông báo rõ ràng
+            var hasHistories = await _context.KetQuaThis.AsNoTracking().AnyAsync(k => k.TaiKhoanId == id);
+            var hasContacts = await _context.LienHes.AsNoTracking().AnyAsync(l => l.TaiKhoanId == id);
+            if (hasHistories || hasContacts)
+            {
+                return BadRequest("Không thể xoá tài khoản vì có lịch sử thi hoặc liên hệ liên quan.");
+            }
+
+            // Xoá bình luận của người dùng trước khi xoá tài khoản
+            await _context.BinhLuans.Where(b => b.TaiKhoanId == id).ExecuteDeleteAsync();
+
+            // Xoá tài khoản
+            var result = await _userManager.DeleteAsync(user);
+            if (!result.Succeeded)
+            {
+                return BadRequest(result.Errors);
+            }
+
+            return NoContent();
         }
     }
 }

@@ -14,6 +14,7 @@ import 'admin/admin_dashboard_screen.dart';
 import 'exam_detail_screen.dart';
 import 'login_screen.dart';
 import 'result_review_screen.dart';
+import 'statistics_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -1061,6 +1062,16 @@ class _ProfileTab extends StatelessWidget {
                         'Tính năng thông báo đang được phát triển.',
                       ),
                     ),
+                  );
+                },
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.bar_chart_outlined),
+                title: const Text('Thống kê kết quả'),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const StatisticsScreen()),
                   );
                 },
               ),
